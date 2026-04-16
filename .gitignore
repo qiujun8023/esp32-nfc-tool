@@ -1,0 +1,20 @@
+# Build
+build/
+sdkconfig.old
+
+# ESP-IDF managed components
+managed_components/
+dependencies.lock
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code
+.claude/
+.cache/

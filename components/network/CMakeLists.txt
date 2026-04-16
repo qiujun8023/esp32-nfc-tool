@@ -1,0 +1,29 @@
+idf_component_register(
+    SRCS
+        "src/wifi_ap.c"
+        "src/captive_dns.c"
+        "src/http_server.c"
+        "src/api_nfc.c"
+        "src/api_dumps.c"
+        "src/api_keys.c"
+        "src/api_ota.c"
+        "src/ws_progress.c"
+    INCLUDE_DIRS "include"
+    REQUIRES
+        config
+        nfc
+        storage
+        web_ui
+        esp_http_server
+    PRIV_REQUIRES
+        esp_wifi
+        esp_netif
+        esp_event
+        esp_timer
+        json
+        littlefs
+        mdns
+        app_update
+        esp_app_format
+        lwip
+)

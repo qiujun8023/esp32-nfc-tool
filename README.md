@@ -6,11 +6,10 @@ ESP32-C3 + PN532 的便携 NFC 工具：开 Wi-Fi AP，浏览器操作，复制 
 
 - 扫描 ISO14443A 卡片（Mifare Classic 1K/4K、NTAG21x、Ultralight）
 - 魔术卡检测（Gen1a / Gen2 CUID）
-- UID 克隆到魔术卡（写后自动校验）
 - Mifare Classic **字典攻击** + 完整 dump（写回时逐块校验）
 - NTAG 全页读取 / 写回
 - NDEF 解析与写入（URI、Text 记录）
-- 卡库管理：列表 / 改名 / 下载（.bin / .txt）/ 导入 / 写回 / 删除
+- 卡库管理：列表 / 改名 / 下载 .bin / 导入 / 写回 / 删除
 - Mifare Classic 访问位解码（权限可视化）
 - 自定义密钥库（NVS 持久化）+ 50 条内置默认密钥
 - WebSocket 实时进度推送（扇区级别）
@@ -50,8 +49,8 @@ idf.py -p /dev/tty.usbmodem* flash monitor
 1. 烧录后串口能看到 `PN532 firmware: 0x...`，说明硬件 OK
 2. 手机/电脑连 Wi-Fi `esp32-nfc-tool`（开放网络，无密码）
 3. 浏览器打开 `http://192.168.4.1/` 或 `http://nfc.local/`（多数系统会自动弹）
-4. 「扫描」页贴卡 → 看到 UID → 选「克隆 UID」或「完整 dump」
-5. 完整 dump 期间扇区网格会实时显示进度
+4. 「扫描」页贴卡 → 看到 UID → 选「读取 Dump」或 NTAG 的「读取 NDEF」
+5. 读取期间扇区/进度条实时更新；存入卡库后可改名 / 下载 / 写回 / 删除
 
 ## 引脚改动
 

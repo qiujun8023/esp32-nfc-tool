@@ -84,7 +84,7 @@ esp_err_t ndef_parse(const ntag_dump_t* dump, ndef_record_t* out) {
     bool    sr       = (flags & 0x10) != 0;  // Short Record
     bool    il       = (flags & 0x08) != 0;  // ID Length present
 
-    uint16_t payload_len;
+    uint32_t payload_len;
     uint16_t hdr = 2;
     if (sr) {
         payload_len = rec[hdr++];
@@ -137,16 +137,17 @@ esp_err_t ndef_parse(const ntag_dump_t* dump, ndef_record_t* out) {
 
 // 匹配最长 URI 前缀，返回前缀代码
 static uint8_t match_uri_prefix(const char* uri, size_t* prefix_len) {
-    // 先尝试长前缀（https://www. > https://）
-    for (int i = URI_PREFIX_COUNT - 1; i >= 1; i--) {
+    uint8_t best = 0;
+    size_t  best_len = 0;
+    for (int i = 1; i < (int)URI_PREFIX_COUNT; i++) {
         size_t plen = strlen(URI_PREFIXES[i]);
-        if (strncmp(uri, URI_PREFIXES[i], plen) == 0) {
-            *prefix_len = plen;
-            return (uint8_t)i;
+        if (plen > best_len && strncmp(uri, URI_PREFIXES[i], plen) == 0) {
+            best     = (uint8_t)i;
+            best_len = plen;
         }
     }
-    *prefix_len = 0;
-    return NDEF_URI_NONE;
+    *prefix_len = best_len;
+    return best;
 }
 
 // 写入 NDEF 消息到 NTAG（从 page 4 开始）

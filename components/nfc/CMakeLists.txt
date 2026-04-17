@@ -4,6 +4,8 @@ idf_component_register(
         "src/mifare_classic.c"
         "src/ntag.c"
         "src/ndef.c"
+        "src/default_keys.c"
+        "src/nfc_cancel.c"
     INCLUDE_DIRS "include"
     PRIV_REQUIRES
         config

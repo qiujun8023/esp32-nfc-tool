@@ -90,8 +90,8 @@ esp_err_t keys_store_remove(size_t index) {
         snprintf(k1, sizeof(k1), "k%02d", i);
         snprintf(k2, sizeof(k2), "k%02d", i + 1);
         uint8_t buf[MFC_KEY_LEN];
-        size_t  l = MFC_KEY_LEN;
-        nvs_get_blob(h, k2, buf, &l);
+        size_t  l = MFC_KEY_LEN;  // 每次迭代重置
+        if (nvs_get_blob(h, k2, buf, &l) != ESP_OK) continue;
         nvs_set_blob(h, k1, buf, MFC_KEY_LEN);
     }
     char klast[8];

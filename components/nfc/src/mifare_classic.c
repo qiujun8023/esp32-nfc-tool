@@ -1,6 +1,6 @@
 /**
  * @file mifare_classic.c
- * @brief Mifare Classic 1K/4K 操作：认证、读写、字典攻击、UID 克隆
+ * @brief Mifare Classic 1K/4K 操作：认证、读写、字典攻击
  */
 
 #include "mifare_classic.h"
@@ -10,6 +10,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "nfc_cancel.h"
 
 static const char* TAG = "mfc";
 
@@ -68,41 +69,6 @@ esp_err_t mfc_write_block(uint8_t block, const uint8_t in[MFC_BLOCK_LEN]) {
     return pn532_in_data_exchange(tx, sizeof(tx), rx, &rx_len, 200);
 }
 
-esp_err_t mfc_clone_uid(const uint8_t* new_uid, uint8_t uid_len, bool* verify_ok) {
-    if (uid_len != 4 && uid_len != 7) return ESP_ERR_INVALID_ARG;
-    if (verify_ok) *verify_ok = false;
-
-    pn532_target_t cur;
-    if (pn532_read_passive_target(&cur, 1000) != ESP_OK) return ESP_ERR_NOT_FOUND;
-
-    // CUID/UFUID 卡 block 0 用默认 key 即可写
-    uint8_t key[MFC_KEY_LEN] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-    if (mfc_authenticate(cur.uid, cur.uid_len, 0, MFC_KEY_A, key) != ESP_OK) {
-        return ESP_FAIL;
-    }
-
-    uint8_t block0[MFC_BLOCK_LEN] = {0};
-    if (mfc_read_block(0, block0) != ESP_OK) return ESP_FAIL;
-
-    // 替换 UID 部分，BCC 重新计算（仅 4 字节 UID 卡有 BCC）
-    if (uid_len == 4) {
-        memcpy(block0, new_uid, 4);
-        block0[4] = block0[0] ^ block0[1] ^ block0[2] ^ block0[3];
-    } else {
-        memcpy(block0, new_uid, 7);
-    }
-    esp_err_t err = mfc_write_block(0, block0);
-    if (err != ESP_OK) return err;
-
-    // 回读验证：重新选卡后读 block 0 对比 UID
-    if (pn532_read_passive_target(&cur, 1000) == ESP_OK) {
-        if (verify_ok) {
-            *verify_ok = (memcmp(cur.uid, new_uid, uid_len) == 0);
-        }
-    }
-    return ESP_OK;
-}
-
 mfc_magic_type_t mfc_detect_magic(void) {
     // Gen1a 检测：发送 backdoor 命令 0x40 (halt bypass)
     // 如果卡响应 ACK (0x0A)，说明是 Gen1a (CUID/UFUID)
@@ -132,14 +98,32 @@ mfc_magic_type_t mfc_detect_magic(void) {
     return MFC_MAGIC_NONE;
 }
 
+typedef enum {
+    TRY_OK = 0,
+    TRY_WRONG_KEY,
+    TRY_CARD_LOST,
+} try_res_t;
+
 /**
- * @brief 重新选卡并尝试 key 认证（PN532 在 auth 失败后必须重新 select）
+ * @brief 重新选卡并尝试 key 认证
+ *
+ * PN532 在 auth 失败后卡进入 halted 状态，下一次认证前必须 re-select。
+ * re-select 偶发超时（RF/时序抖动），静默跳过会让正确的 key 永远试不到。
+ * 连续 3 次 re-select 均失败 => 卡已离开，返回 CARD_LOST 让上层早退。
  */
-static bool try_key(const pn532_target_t* tgt, uint8_t block, mfc_key_type_t kt, const uint8_t* key) {
-    pn532_target_t reselect;
-    if (pn532_read_passive_target(&reselect, 200) != ESP_OK) return false;
-    if (reselect.uid_len != tgt->uid_len || memcmp(reselect.uid, tgt->uid, tgt->uid_len) != 0) return false;
-    return mfc_authenticate(reselect.uid, reselect.uid_len, block, kt, key) == ESP_OK;
+static try_res_t try_key(const pn532_target_t* tgt, uint8_t block, mfc_key_type_t kt, const uint8_t* key) {
+    for (int attempt = 0; attempt < 3; attempt++) {
+        pn532_target_t reselect;
+        if (pn532_read_passive_target(&reselect, 300) == ESP_OK &&
+            reselect.uid_len == tgt->uid_len &&
+            memcmp(reselect.uid, tgt->uid, tgt->uid_len) == 0) {
+            return mfc_authenticate(reselect.uid, reselect.uid_len, block, kt, key) == ESP_OK
+                       ? TRY_OK
+                       : TRY_WRONG_KEY;
+        }
+        vTaskDelay(pdMS_TO_TICKS(8));
+    }
+    return TRY_CARD_LOST;
 }
 
 esp_err_t mfc_full_read(const pn532_target_t* target,
@@ -152,12 +136,22 @@ esp_err_t mfc_full_read(const pn532_target_t* target,
     dump->block_count  = (target->type == PN532_CARD_MIFARE_CLASSIC_4K) ? 256 : 64;
 
     for (uint8_t s = 0; s < dump->sector_count; s++) {
+        if (nfc_cancel_pending()) {
+            ESP_LOGW(TAG, "full_read cancelled at sector %u", s);
+            return ESP_ERR_TIMEOUT;
+        }
         uint8_t first  = mfc_sector_first_block(s);
         uint8_t blocks = mfc_sector_block_count(s);
 
         // 先试 Key A
         for (size_t k = 0; k < keys_count; k++) {
-            if (try_key(target, first, MFC_KEY_A, keys[k])) {
+            if (nfc_cancel_pending()) return ESP_ERR_TIMEOUT;
+            try_res_t r = try_key(target, first, MFC_KEY_A, keys[k]);
+            if (r == TRY_CARD_LOST) {
+                ESP_LOGW(TAG, "card lost at sector %u (key A)", s);
+                return ESP_ERR_NOT_FOUND;
+            }
+            if (r == TRY_OK) {
                 dump->key_a[s].found = true;
                 memcpy(dump->key_a[s].key, keys[k], MFC_KEY_LEN);
                 // 用 Key A 读所有块
@@ -173,7 +167,13 @@ esp_err_t mfc_full_read(const pn532_target_t* target,
 
         // 再试 Key B
         for (size_t k = 0; k < keys_count; k++) {
-            if (try_key(target, first, MFC_KEY_B, keys[k])) {
+            if (nfc_cancel_pending()) return ESP_ERR_TIMEOUT;
+            try_res_t r = try_key(target, first, MFC_KEY_B, keys[k]);
+            if (r == TRY_CARD_LOST) {
+                ESP_LOGW(TAG, "card lost at sector %u (key B)", s);
+                return ESP_ERR_NOT_FOUND;
+            }
+            if (r == TRY_OK) {
                 dump->key_b[s].found = true;
                 memcpy(dump->key_b[s].key, keys[k], MFC_KEY_LEN);
                 // 若某些块未读到（B-only 权限），用 Key B 补读
@@ -210,6 +210,11 @@ esp_err_t mfc_full_write(const mfc_dump_t* dump,
     if (pn532_read_passive_target(&cur, 1000) != ESP_OK) return ESP_ERR_NOT_FOUND;
 
     for (uint8_t s = 0; s < dump->sector_count; s++) {
+        if (nfc_cancel_pending()) {
+            ESP_LOGW(TAG, "full_write cancelled at sector %u", s);
+            if (verify_fail_count) *verify_fail_count = fails;
+            return ESP_ERR_TIMEOUT;
+        }
         const mfc_known_key_t* known = dump->key_a[s].found ? &dump->key_a[s] : &dump->key_b[s];
         if (!known->found) {
             if (cb) cb(s, dump->sector_count, false, false, user);
@@ -219,7 +224,13 @@ esp_err_t mfc_full_write(const mfc_dump_t* dump,
         uint8_t        first = mfc_sector_first_block(s);
         uint8_t        blocks = mfc_sector_block_count(s);
 
-        if (!try_key(&cur, first, kt, known->key)) {
+        try_res_t r1 = try_key(&cur, first, kt, known->key);
+        if (r1 == TRY_CARD_LOST) {
+            ESP_LOGW(TAG, "full_write: card lost at sector %u", s);
+            if (verify_fail_count) *verify_fail_count = fails;
+            return ESP_ERR_NOT_FOUND;
+        }
+        if (r1 != TRY_OK) {
             if (cb) cb(s, dump->sector_count, false, false, user);
             continue;
         }
@@ -230,20 +241,27 @@ esp_err_t mfc_full_write(const mfc_dump_t* dump,
         }
 
         // 回读验证：重新认证后逐 block 比对
-        if (try_key(&cur, first, kt, known->key)) {
+        // Trailer 块的 Key A (0..5) 读回恒为 0，Key B (10..15) 也可能被屏蔽，
+        // 只能对比 access bits + user byte (6..9)。
+        if (try_key(&cur, first, kt, known->key) == TRY_OK) {
             for (uint8_t b = start; b < blocks; b++) {
                 uint8_t readback[MFC_BLOCK_LEN];
+                bool is_trailer = (b == blocks - 1);
                 if (mfc_read_block(first + b, readback) == ESP_OK) {
-                    if (memcmp(readback, dump->data[first + b], MFC_BLOCK_LEN) != 0) {
-                        fails++;
+                    bool mismatch;
+                    if (is_trailer) {
+                        mismatch = memcmp(readback + 6, dump->data[first + b] + 6, 4) != 0;
+                    } else {
+                        mismatch = memcmp(readback, dump->data[first + b], MFC_BLOCK_LEN) != 0;
                     }
+                    if (mismatch) fails++;
                 } else {
                     fails++;
                 }
             }
         }
 
-        if (cb) cb(s, dump->sector_count, true, dump->key_b[s].found, user);
+        if (cb) cb(s, dump->sector_count, dump->key_a[s].found, dump->key_b[s].found, user);
     }
     if (verify_fail_count) *verify_fail_count = fails;
     return ESP_OK;

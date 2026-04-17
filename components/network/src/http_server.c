@@ -105,9 +105,10 @@ static esp_err_t reply_connectivity_success(httpd_req_t* req) {
     }
 
     /* 非探测 URL（用户在浏览器随便输了什么）→ 重定向到主页 */
-    httpd_resp_set_status(req, "302 Found");
+    httpd_resp_set_status(req, "303 See Other");
     httpd_resp_set_hdr(req, "Location", "http://192.168.4.1/");
-    return httpd_resp_send(req, NULL, 0);
+    /* iOS 需要非空 body 才会判定为 captive portal 并触发弹窗 */
+    return httpd_resp_sendstr(req, "Redirect to captive portal");
 }
 
 /**
@@ -124,9 +125,10 @@ esp_err_t handle_redirect(httpd_req_t* req) {
         return reply_connectivity_success(req);
     }
     /* 新客户端：302 重定向，触发 captive portal 弹窗 */
-    httpd_resp_set_status(req, "302 Found");
+    httpd_resp_set_status(req, "303 See Other");
     httpd_resp_set_hdr(req, "Location", "http://192.168.4.1/");
-    return httpd_resp_send(req, NULL, 0);
+    /* iOS 需要非空 body 才会判定为 captive portal 并触发弹窗 */
+    return httpd_resp_sendstr(req, "Redirect to captive portal");
 }
 
 esp_err_t handle_status(httpd_req_t* req) {
@@ -149,12 +151,24 @@ esp_err_t handle_status(httpd_req_t* req) {
     return ESP_OK;
 }
 
+/* captive portal：所有未注册 URL 都走这里 → 重定向到主页 */
+static esp_err_t handle_404_redirect(httpd_req_t* req, httpd_err_code_t err) {
+    (void)err;
+    return handle_redirect(req);
+}
+
 httpd_handle_t http_server_start(void) {
     httpd_config_t cfg    = HTTPD_DEFAULT_CONFIG();
     cfg.lru_purge_enable  = true;
     cfg.uri_match_fn      = httpd_uri_match_wildcard;
     cfg.max_uri_handlers  = 32;
     cfg.stack_size        = 8192;
+    cfg.max_open_sockets  = 13;
+
+    /* captive 重定向会产生大量 404/断连，降噪 */
+    esp_log_level_set("httpd_uri",   ESP_LOG_ERROR);
+    esp_log_level_set("httpd_txrx",  ESP_LOG_ERROR);
+    esp_log_level_set("httpd_parse", ESP_LOG_ERROR);
 
     httpd_handle_t srv = NULL;
     if (httpd_start(&srv, &cfg) != ESP_OK) {
@@ -179,9 +193,8 @@ httpd_handle_t http_server_start(void) {
     api_keys_register(srv);
     api_ota_register(srv);
 
-    // captive portal 探测 URL
-    httpd_uri_t u_catch = {.uri = "/*", .method = HTTP_GET, .handler = handle_redirect};
-    httpd_register_uri_handler(srv, &u_catch);
+    /* captive portal：所有未注册 URL 走 404 处理器，避免通配符吞掉已注册 handler */
+    httpd_register_err_handler(srv, HTTPD_404_NOT_FOUND, handle_404_redirect);
 
     ws_progress_init(srv);
     ESP_LOGI(TAG, "http server started");

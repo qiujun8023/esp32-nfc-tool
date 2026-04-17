@@ -10,19 +10,18 @@
 #include "cJSON.h"
 #include "default_keys.h"
 #include "esp_log.h"
+#include "hex_util.h"
 #include "http_server.h"
 #include "keys_store.h"
 #include "mifare_classic.h"
 
 static const char* TAG = "api_keys";
 
-static void key_to_hex(const uint8_t* k, char out[13]) {
-    static const char H[] = "0123456789ABCDEF";
-    for (int i = 0; i < 6; i++) {
-        out[i * 2]     = H[k[i] >> 4];
-        out[i * 2 + 1] = H[k[i] & 0xF];
-    }
-    out[12] = 0;
+static const char JSON_CT[] = "application/json";
+
+static esp_err_t send_json(httpd_req_t* req, const char* s) {
+    httpd_resp_set_type(req, JSON_CT);
+    return httpd_resp_sendstr(req, s);
 }
 
 static esp_err_t handle_get(httpd_req_t* req) {
@@ -31,7 +30,7 @@ static esp_err_t handle_get(httpd_req_t* req) {
     cJSON* defaults = cJSON_CreateArray();
     for (size_t i = 0; i < MIFARE_DEFAULT_KEY_COUNT; i++) {
         char hex[13];
-        key_to_hex(MIFARE_DEFAULT_KEYS[i], hex);
+        hex_encode_upper(MIFARE_DEFAULT_KEYS[i], MFC_KEY_LEN, hex);
         cJSON_AddItemToArray(defaults, cJSON_CreateString(hex));
     }
     cJSON_AddItemToObject(root, "defaults", defaults);
@@ -41,51 +40,57 @@ static esp_err_t handle_get(httpd_req_t* req) {
     size_t  n = keys_store_load_user(buf, KEYS_USER_MAX);
     for (size_t i = 0; i < n; i++) {
         char hex[13];
-        key_to_hex(buf[i], hex);
+        hex_encode_upper(buf[i], MFC_KEY_LEN, hex);
         cJSON_AddItemToArray(user, cJSON_CreateString(hex));
     }
     cJSON_AddItemToObject(root, "user", user);
 
     char* s = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr(req, s);
+    esp_err_t err = send_json(req, s);
     free(s);
-    return ESP_OK;
+    return err;
 }
 
 static esp_err_t handle_post(httpd_req_t* req) {
-    char body[64] = {0};
+    char body[96] = {0};
     int  n        = httpd_req_recv(req, body, sizeof(body) - 1);
-    if (n <= 0) return httpd_resp_sendstr(req, "{\"ok\":false}");
-    body[n]   = 0;
+    if (n <= 0) return send_json(req, "{\"ok\":false,\"err\":\"空 body\"}");
+    body[n] = 0;
+
     cJSON* j = cJSON_Parse(body);
-    if (!j) return httpd_resp_sendstr(req, "{\"ok\":false,\"err\":\"JSON\"}");
+    if (!j) return send_json(req, "{\"ok\":false,\"err\":\"JSON\"}");
+
     cJSON* k = cJSON_GetObjectItem(j, "key");
-    if (!cJSON_IsString(k) || strlen(k->valuestring) != 12) {
+    if (!cJSON_IsString(k) || !hex_is_valid(k->valuestring, 12)) {
         cJSON_Delete(j);
-        return httpd_resp_sendstr(req, "{\"ok\":false,\"err\":\"key 必须是 12 字符 hex\"}");
+        return send_json(req, "{\"ok\":false,\"err\":\"key 必须是 12 字符 hex\"}");
     }
-    uint8_t key[6];
-    for (int i = 0; i < 6; i++) {
-        char c[3] = {k->valuestring[i * 2], k->valuestring[i * 2 + 1], 0};
-        key[i]    = (uint8_t)strtoul(c, NULL, 16);
-    }
+    uint8_t key[MFC_KEY_LEN];
+    size_t  klen = 0;
+    hex_decode(k->valuestring, key, sizeof(key), &klen, true);
     cJSON_Delete(j);
+    if (klen != MFC_KEY_LEN) return send_json(req, "{\"ok\":false,\"err\":\"key 长度错\"}");
 
     esp_err_t err = keys_store_add(key);
-    httpd_resp_set_type(req, "application/json");
-    return httpd_resp_sendstr(req, err == ESP_OK ? "{\"ok\":true}" : "{\"ok\":false,\"err\":\"满\"}");
+    return send_json(req, err == ESP_OK ? "{\"ok\":true}" : "{\"ok\":false,\"err\":\"满\"}");
 }
 
 static esp_err_t handle_delete(httpd_req_t* req) {
     // /api/keys/<index>
     const char* p = strrchr(req->uri, '/');
-    if (!p) return httpd_resp_sendstr(req, "{\"ok\":false}");
-    int idx = atoi(p + 1);
-    keys_store_remove((size_t)idx);
-    httpd_resp_set_type(req, "application/json");
-    return httpd_resp_sendstr(req, "{\"ok\":true}");
+    if (!p) return send_json(req, "{\"ok\":false,\"err\":\"缺 index\"}");
+    p++;
+    // 必须为纯数字且长度合理
+    if (!*p) return send_json(req, "{\"ok\":false,\"err\":\"index 非法\"}");
+    for (const char* c = p; *c; c++) {
+        if (*c < '0' || *c > '9') return send_json(req, "{\"ok\":false,\"err\":\"index 非法\"}");
+    }
+    long idx = strtol(p, NULL, 10);
+    if (idx < 0 || idx >= KEYS_USER_MAX) return send_json(req, "{\"ok\":false,\"err\":\"index 越界\"}");
+
+    esp_err_t err = keys_store_remove((size_t)idx);
+    return send_json(req, err == ESP_OK ? "{\"ok\":true}" : "{\"ok\":false}");
 }
 
 void api_keys_register(httpd_handle_t srv) {

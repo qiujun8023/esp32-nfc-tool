@@ -35,11 +35,12 @@ static void dns_task(void* arg) {
 
     uint8_t            buf[512];
     struct sockaddr_in cli;
-    socklen_t          clen = sizeof(cli);
 
     while (1) {
+        socklen_t clen = sizeof(cli);
         int n = recvfrom(sock, buf, sizeof(buf), 0, (struct sockaddr*)&cli, &clen);
         if (n < 12) continue;
+        if (n > 512 - 16) continue;  // 确保追加应答记录后不溢出
         uint8_t resp[512];
         memcpy(resp, buf, n);
         resp[2] = 0x81;

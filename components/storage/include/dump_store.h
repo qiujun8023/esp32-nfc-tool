@@ -22,15 +22,16 @@ typedef struct {
     uint8_t     sak;
     uint16_t    block_or_page_count;  // mfc: 块数；ntag: 页数
     uint8_t     known_keys;           // mfc 已知 key 数量
-    uint32_t    seq;                  // 自增序号（替代 unix 时间）
+    uint32_t    seq;                  // 自增序号，用于排序
     uint16_t    bin_size;             // .bin 大小
+    int64_t     created_ms;           // 浏览器上传的 Unix 毫秒（0=未知，设备无 RTC）
 } dump_meta_t;
 
 esp_err_t dump_store_init(void);
 
-// 保存 Mifare Classic dump（生成 .bin + .json）
-esp_err_t dump_store_save_mfc(const mfc_dump_t* d, const char* name, char out_id[40]);
-esp_err_t dump_store_save_ntag(const ntag_dump_t* d, const pn532_target_t* tgt, const char* name, char out_id[40]);
+// 保存 Mifare Classic dump（生成 .bin + .json）。created_ms<=0 表示未知
+esp_err_t dump_store_save_mfc(const mfc_dump_t* d, const char* name, int64_t created_ms, char out_id[40]);
+esp_err_t dump_store_save_ntag(const ntag_dump_t* d, const pn532_target_t* tgt, const char* name, int64_t created_ms, char out_id[40]);
 
 // 列出所有 dump（最多 max_n 条），返回实际数量
 size_t dump_store_list(dump_meta_t* out, size_t max_n);
@@ -43,6 +44,9 @@ esp_err_t dump_store_read_bin(const char* id, uint8_t** buf, size_t* len);
 
 // 读出完整 mfc dump（用于回写）
 esp_err_t dump_store_load_mfc(const char* id, mfc_dump_t* dump);
+
+// 从 trailer 恢复 key（data[] 已填好）；供 load/upload 共享。
+void dump_store_recover_trailer_keys(mfc_dump_t* dump);
 
 esp_err_t dump_store_delete(const char* id);
 esp_err_t dump_store_rename(const char* id, const char* new_name);

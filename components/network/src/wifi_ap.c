@@ -1,6 +1,6 @@
 /**
  * @file wifi_ap.c
- * @brief 启动 SoftAP（简化版，严格对齐 IDF 官方 softap 例程）
+ * @brief SoftAP + DHCPS captive portal 配置
  */
 
 #include "wifi_ap.h"
@@ -13,6 +13,7 @@
 #include "esp_netif.h"
 #include "esp_wifi.h"
 #include "http_server.h"
+#include "lwip/ip4_addr.h"
 #include "mdns.h"
 
 static const char* TAG = "wifi_ap";
@@ -27,10 +28,36 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
+/* DHCP 选项 114：captive portal URI（RFC 8910），iOS 14+/Android 11+ 据此自动弹窗 */
+static char s_portal_uri[] = "http://192.168.4.1/";
+
+static void configure_dhcps_captive(esp_netif_t* ap_netif) {
+    /* 必须先停 DHCPS 才能改选项 */
+    esp_netif_dhcps_stop(ap_netif);
+
+    /* 显式把自己设为客户端的主 DNS，让 captive_dns 能截获所有域名查询 */
+    esp_netif_dns_info_t dns = { .ip.type = ESP_IPADDR_TYPE_V4 };
+    IP4_ADDR(&dns.ip.u_addr.ip4, 192, 168, 4, 1);
+    esp_netif_set_dns_info(ap_netif, ESP_NETIF_DNS_MAIN, &dns);
+
+    /* 默认 dhcps_dns=0（不下发 DNS option），这里打开 */
+    uint8_t offer_dns = 1;
+    esp_netif_dhcps_option(ap_netif, ESP_NETIF_OP_SET,
+                           ESP_NETIF_DOMAIN_NAME_SERVER,
+                           &offer_dns, sizeof(offer_dns));
+
+    esp_netif_dhcps_option(ap_netif, ESP_NETIF_OP_SET,
+                           ESP_NETIF_CAPTIVEPORTAL_URI,
+                           s_portal_uri, sizeof(s_portal_uri) - 1);
+
+    esp_netif_dhcps_start(ap_netif);
+}
+
 void wifi_ap_start(void) {
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    esp_netif_create_default_wifi_ap();
+    esp_netif_t* ap_netif = esp_netif_create_default_wifi_ap();
+    configure_dhcps_captive(ap_netif);
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
@@ -47,8 +74,8 @@ void wifi_ap_start(void) {
             .pmf_cfg        = { .required = true },
         },
     };
-    strcpy((char*)wifi_config.ap.ssid, WIFI_AP_SSID);
-    strcpy((char*)wifi_config.ap.password, WIFI_AP_PASS);
+    strlcpy((char*)wifi_config.ap.ssid,     WIFI_AP_SSID, sizeof(wifi_config.ap.ssid));
+    strlcpy((char*)wifi_config.ap.password, WIFI_AP_PASS, sizeof(wifi_config.ap.password));
     if (strlen(WIFI_AP_PASS) == 0) {
         wifi_config.ap.authmode = WIFI_AUTH_OPEN;
     }

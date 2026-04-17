@@ -25,7 +25,7 @@ typedef struct {
 typedef struct {
     pn532_target_t  target;
     uint8_t         sector_count;
-    uint8_t         block_count;  // 1K=64, 4K=256
+    uint16_t        block_count;  // 1K=64, 4K=256
     mfc_known_key_t key_a[MFC_MAX_SECTORS];
     mfc_known_key_t key_b[MFC_MAX_SECTORS];
     uint8_t         data[256][MFC_BLOCK_LEN];  // 块数据，足以容纳 4K
@@ -39,9 +39,6 @@ typedef void (*mfc_progress_cb)(uint8_t sector, uint8_t total, bool key_a_found,
 esp_err_t mfc_authenticate(const uint8_t* uid, uint8_t uid_len, uint8_t block, mfc_key_type_t kt, const uint8_t* key);
 esp_err_t mfc_read_block(uint8_t block, uint8_t out[MFC_BLOCK_LEN]);
 esp_err_t mfc_write_block(uint8_t block, const uint8_t in[MFC_BLOCK_LEN]);
-
-// UID 克隆（写到 CUID/UFUID 魔术卡的 block 0），verify_ok 非空时回写验证结果
-esp_err_t mfc_clone_uid(const uint8_t* new_uid, uint8_t uid_len, bool* verify_ok);
 
 // 字典攻击 + 完整读卡，结果填入 dump
 // keys：候选 key 数组（前 N 条用户的 + 默认 50 条）；keys_count 总数

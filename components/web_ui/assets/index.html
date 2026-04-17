@@ -2,41 +2,95 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>ESP32 NFC Tool</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>NFC Tool</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<header class="topbar">
-  <div class="brand">
-    <span class="dot"></span>
-    <span>esp32-nfc-tool</span>
+
+<header id="header">
+  <div class="hdr-left">
+    <span class="hdr-title">NFC TOOL</span>
   </div>
-  <div class="meta" id="meta">PN532: --</div>
+  <div class="hdr-right">
+    <span class="hdr-state" id="hdrState">连接中</span>
+    <div class="status-dot" id="statusDot"></div>
+  </div>
 </header>
 
-<main id="view"></main>
+<main id="app"></main>
 
-<nav class="tabbar">
-  <button class="tab" data-tab="scan" aria-label="扫描">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.2 4.2l2.8 2.8M17 17l2.8 2.8M1 12h4M19 12h4M4.2 19.8l2.8-2.8M17 7l2.8-2.8"/></svg>
+<nav id="nav">
+  <button class="nav-item active" data-tab="scan">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12C2 6.5 6.5 2 12 2s10 4.5 10 10-4.5 10-10 10S2 17.5 2 12z"/><path d="M12 9a3 3 0 100 6 3 3 0 000-6z"/><path d="M2 12h4M18 12h4M12 2v4M12 18v4"/></svg>
     <span>扫描</span>
   </button>
-  <button class="tab" data-tab="library" aria-label="卡库">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="14" height="14" rx="2"/><path d="M7 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v14"/></svg>
+  <button class="nav-item" data-tab="library">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="16" height="16" rx="2"/><path d="M6 6V4a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2h-2"/></svg>
     <span>卡库</span>
   </button>
-  <button class="tab" data-tab="keys" aria-label="密钥">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M10.85 12.15L19 4M18 5l2 2M15 8l2 2"/></svg>
+  <button class="nav-item" data-tab="keys">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="15" r="4"/><path d="M10.85 12.15L19 4M18 5l2 2M15 8l2 2"/></svg>
     <span>密钥</span>
   </button>
-  <button class="tab" data-tab="settings" aria-label="设置">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  <button class="nav-item" data-tab="settings">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
     <span>设置</span>
   </button>
 </nav>
 
-<div id="toast" class="toast hidden"></div>
+<div id="toast" class="toast"></div>
+
+<!-- 确认对话框 -->
+<div id="modal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <p id="modalMsg"></p>
+    <div class="modal-actions">
+      <button class="mbtn" id="modalCancel">取消</button>
+      <button class="mbtn mbtn-primary" id="modalOk">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- 输入对话框 -->
+<div id="promptModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <p id="promptMsg"></p>
+    <input class="modal-input" id="promptInput" type="text">
+    <div class="modal-actions">
+      <button class="mbtn" id="promptCancel">取消</button>
+      <button class="mbtn mbtn-primary" id="promptOk">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- 导入 Dump 对话框 -->
+<div id="importModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <h3 class="modal-title">导入 Dump 文件</h3>
+    <div class="modal-meta" id="importFileInfo"></div>
+    <div class="modal-label">名字</div>
+    <input class="modal-input" id="importName" type="text">
+    <div class="modal-label">类型</div>
+    <div class="type-radio">
+      <label class="type-opt">
+        <input type="radio" name="importType" value="mfc">
+        <span>Mifare Classic</span>
+      </label>
+      <label class="type-opt">
+        <input type="radio" name="importType" value="ntag">
+        <span>NTAG / Ultralight</span>
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="mbtn" id="importCancelBtn">取消</button>
+      <button class="mbtn mbtn-primary" id="importOkBtn">导入</button>
+    </div>
+  </div>
+</div>
 
 <script src="/app.js"></script>
 </body>

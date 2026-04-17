@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "esp_log.h"
+#include "nfc_cancel.h"
 
 static const char* TAG = "ntag";
 
@@ -73,9 +74,20 @@ esp_err_t ntag_full_read(const pn532_target_t* tgt, ntag_dump_t* dump) {
     memset(dump, 0, sizeof(*dump));
     dump->type        = ntag_detect_type();
     dump->total_pages = pages_for(dump->type);
+    int consecutive_fail = 0;
     for (uint16_t p = 0; p < dump->total_pages; p++) {
+        if (nfc_cancel_pending()) {
+            ESP_LOGW(TAG, "ntag full_read cancelled at page %u", p);
+            return ESP_ERR_TIMEOUT;
+        }
         if (ntag_read_page(p, dump->pages[p]) == ESP_OK) {
             dump->page_read[p] = true;
+            consecutive_fail = 0;
+        } else {
+            if (++consecutive_fail >= 4) {
+                ESP_LOGW(TAG, "ntag: 4 consecutive page reads failed at %u, assume card lost", p);
+                return ESP_ERR_NOT_FOUND;
+            }
         }
     }
     ESP_LOGI(TAG, "ntag dump done, type=%d pages=%d", dump->type, dump->total_pages);
@@ -85,6 +97,10 @@ esp_err_t ntag_full_read(const pn532_target_t* tgt, ntag_dump_t* dump) {
 esp_err_t ntag_full_write(const ntag_dump_t* dump) {
     // 跳过 page 0/1（UID 只读）、page 2（lock bytes）、page 3（CC）通常也不写
     for (uint16_t p = 4; p < dump->total_pages; p++) {
+        if (nfc_cancel_pending()) {
+            ESP_LOGW(TAG, "ntag full_write cancelled at page %u", p);
+            return ESP_ERR_TIMEOUT;
+        }
         if (!dump->page_read[p]) continue;
         ntag_write_page((uint8_t)p, dump->pages[p]);
     }

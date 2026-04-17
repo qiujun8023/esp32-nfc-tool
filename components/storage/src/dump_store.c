@@ -205,8 +205,6 @@ esp_err_t dump_store_save_mfc(const mfc_dump_t* d, const char* name, int64_t cre
 
     bool has_old = find_existing_by_uid_type(d->target.uid, d->target.uid_len,
                                              DUMP_TYPE_MIFARE_CLASSIC, old_id, old_name);
-    ESP_LOGI(TAG, "dedup mfc: uid_len=%u has_old=%d old_id=%s",
-             d->target.uid_len, has_old, has_old ? old_id : "");
     if (has_old) {
         merged = calloc(1, sizeof(mfc_dump_t));
         if (merged && dump_store_load_mfc(old_id, merged) == ESP_OK) {
@@ -267,8 +265,6 @@ esp_err_t dump_store_save_ntag(const ntag_dump_t* d, const pn532_target_t* tgt, 
 
     bool has_old = find_existing_by_uid_type(tgt->uid, tgt->uid_len,
                                              DUMP_TYPE_NTAG, old_id, old_name);
-    ESP_LOGI(TAG, "dedup ntag: uid_len=%u has_old=%d old_id=%s",
-             tgt->uid_len, has_old, has_old ? old_id : "");
     if (has_old) {
         uint8_t* old_bin = NULL;
         size_t   old_len = 0;

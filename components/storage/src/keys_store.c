@@ -12,14 +12,10 @@
 
 #include "config.h"
 #include "default_keys.h"
-#include "esp_log.h"
 #include "nvs.h"
-#include "nvs_flash.h"
-
-__attribute__((unused)) static const char* TAG = "keys_store";
 
 esp_err_t keys_store_init(void) {
-    return ESP_OK;  // NVS 已在 main 初始化
+    return ESP_OK;
 }
 
 static esp_err_t open_ns(nvs_handle_t* h, nvs_open_mode_t mode) {

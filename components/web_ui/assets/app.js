@@ -1,10 +1,10 @@
 'use strict';
 
 /* ============================================================
-   ESP32 NFC Tool — Frontend Application
+   ESP32 NFC Tool 前端应用
    ============================================================ */
 
-// ---- State ----
+// ---- 状态 ----
 const S = {
   tab: 'scan',
   busy: false,
@@ -13,11 +13,11 @@ const S = {
   status: null,   // device status
   ws: null,
   taskId: null,
-  // progress tracking
+  // 进度追踪
   sectors: [],
   total: 16,
   logs: [],
-  // library detail subpage
+  // 卡库详情子页
   libDetailId: null,
   libDetailMeta: null,  // 当前选中卡的元数据（来自 list）
   libDetailData: null,  // detail API 返回值（懒加载）
@@ -31,7 +31,7 @@ const $ = (sel, ctx) => (ctx || document).querySelector(sel);
 const $$ = (sel, ctx) => (ctx || document).querySelectorAll(sel);
 const app = $('#app');
 
-// ---- Utilities ----
+// ---- 工具函数 ----
 function esc(s) {
   const d = document.createElement('div');
   d.textContent = String(s);
@@ -92,7 +92,7 @@ function syncBusyUi() {
   $$('.nfc-op').forEach(b => b.disabled = S.busy);
 }
 
-// ---- Toast ----
+// ---- Toast 提示 ----
 let _toastTimer = null;
 function toast(msg, kind) {
   const el = $('#toast');
@@ -103,7 +103,7 @@ function toast(msg, kind) {
   _toastTimer = setTimeout(() => { el.classList.remove('show'); }, dur);
 }
 
-// ---- Custom Dialogs (replace confirm/prompt) ----
+// ---- 自定义对话框（替代 confirm/prompt） ----
 function confirm2(msg) {
   return new Promise(resolve => {
     const overlay = $('#modal');
@@ -132,7 +132,7 @@ function prompt2(msg, defaultVal) {
   });
 }
 
-// ---- API ----
+// ---- API 请求 ----
 async function api(path, opts) {
   opts = opts || {};
   if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof ArrayBuffer)) {
@@ -153,7 +153,7 @@ async function api(path, opts) {
   }
 }
 
-// ---- Log ----
+// ---- 日志 ----
 function addLog(msg, kind) {
   S.logs.unshift({ msg, kind: kind || '' });
   if (S.logs.length > 60) S.logs.length = 60;
@@ -168,7 +168,7 @@ function renderLogs() {
   ).join('');
 }
 
-// ---- WebSocket ----
+// ---- WebSocket 连接 ----
 function wsConnect() {
   if (S.ws) return;
   const ws = new WebSocket('ws://' + location.host + '/ws');
@@ -210,8 +210,8 @@ function handleWs(m) {
         addLog('[完成] 写入验证全部通过', 'ok');
         toast('写入完成，全部通过', 'ok');
       } else {
-        addLog('[完成] ' + r.verifyFails + ' 个 block 验证失败', 'err');
-        toast(r.verifyFails + ' 个 block 验证失败', 'error');
+        addLog('[完成] ' + r.verifyFails + ' 个块验证失败', 'err');
+        toast(r.verifyFails + ' 个块验证失败', 'error');
       }
       if (wasWriting && S.writeTarget) {
         S.writeTarget.verifyFails = r.verifyFails;
@@ -290,7 +290,7 @@ function updateProgress() {
   renderLogs();
 }
 
-// ---- Progress Panel HTML ----
+// ---- 进度面板 HTML ----
 function progressHtml() {
   return '<div class="progress-panel" id="progressPanel">' +
     '<div class="progress-bar-wrap"><div class="progress-bar-fill"></div></div>' +
@@ -314,7 +314,7 @@ async function doCancelOp() {
   addLog('[取消] 已请求中断');
 }
 
-// ---- Status ----
+// ---- 状态查询 ----
 async function refreshStatus() {
   try {
     const s = await api('/api/status');
@@ -324,7 +324,7 @@ async function refreshStatus() {
 }
 
 /* ============================================================
-   SCAN PAGE
+   扫描页
    ============================================================ */
 function renderScan() {
   const hasCard = !!S.card;
@@ -380,7 +380,7 @@ function cardInfoHtml(c) {
   if (c.magic) h += '<span class="tag magic">' + esc(c.magic) + '</span>';
   h += '</div></div>';
 
-  // Action buttons
+  // 操作按钮
   const isReading = S.busy && S.busyType === 'reading';
   const lr = S.lastRead;
   h += '<div class="action-grid">';
@@ -474,7 +474,7 @@ async function viewLastReadDetail() {
     if (Array.isArray(list)) S.libList = list;
   } catch (e) {}
   const meta = (S.libList || []).find(x => x.id === lr.id);
-  if (!meta) { toast('未找到对应 dump', 'error'); return; }
+  if (!meta) { toast('未找到对应 Dump', 'error'); return; }
   S.libDetailId = lr.id;
   S.libDetailMeta = meta;
   S.libDetailData = null;
@@ -592,7 +592,7 @@ async function doNdefWrite() {
 }
 
 /* ============================================================
-   LIBRARY PAGE
+   卡库页
    ============================================================ */
 async function renderLibrary() {
   app.innerHTML =
@@ -609,7 +609,7 @@ async function renderLibrary() {
   $('#importFile').onchange = handleImport;
   $('#refreshLibBtn').onclick = () => renderLibrary();
 
-  // Show progress if writing
+  // 写入中显示进度面板
   if (S.busy && S.busyType === 'writing') {
     showProgress();
   }
@@ -805,7 +805,7 @@ async function handleDumpDetailAction(ev) {
 
   } else if (act === 'write') {
     if (S.busy) { toast('操作进行中', 'error'); return; }
-    const warn = '把 dump 写回当前贴近的卡？\n普通卡 Block 0 (UID) 不会被改写，其余块按已知密钥覆盖。';
+    const warn = '把 Dump 写回当前贴近的卡？\n普通卡 Block 0 (UID) 不会被改写，其余块按已知密钥覆盖。';
     const ok = await confirm2(warn);
     if (!ok) return;
     S.sectors = [];
@@ -851,7 +851,7 @@ async function handleDumpDetailAction(ev) {
 }
 
 /* ============================================================
-   WRITE PROGRESS SUBPAGE
+   写入进度子页
    ============================================================ */
 function renderWriteProgress() {
   const t = S.writeTarget || {};
@@ -905,9 +905,9 @@ function renderNtagDetail(r) {
   let ndefHtml;
   if (ndef.found) {
     if (ndef.type === 'uri') {
-      ndefHtml = '<span class="detail-badge">URI</span> <a href="' + esc(ndef.payload) + '" target="_blank" rel="noopener">' + esc(ndef.payload) + '</a>';
+      ndefHtml = '<span class="detail-badge">URL</span> <a href="' + esc(ndef.payload) + '" target="_blank" rel="noopener">' + esc(ndef.payload) + '</a>';
     } else if (ndef.type === 'text') {
-      ndefHtml = '<span class="detail-badge">Text</span> <code>[' + esc(ndef.lang || '') + ']</code> ' + esc(ndef.payload);
+      ndefHtml = '<span class="detail-badge">文本</span> <code>[' + esc(ndef.lang || '') + ']</code> ' + esc(ndef.payload);
     } else {
       ndefHtml = '<span class="detail-badge">未知类型</span>';
     }
@@ -930,7 +930,7 @@ function renderNtagDetail(r) {
 }
 
 /* ============================================================
-   KEYS PAGE
+   密钥页
    ============================================================ */
 async function renderKeys() {
   app.innerHTML =
@@ -1005,7 +1005,7 @@ async function renderKeys() {
 }
 
 /* ============================================================
-   SETTINGS PAGE
+   设置页
    ============================================================ */
 function renderSettings() {
   const s = S.status || {};
@@ -1109,7 +1109,7 @@ async function handleOta(ev) {
 }
 
 /* ============================================================
-   ROUTING
+   路由
    ============================================================ */
 function setTab(name) {
   if (S.tab !== name && !S.busy) {
@@ -1136,7 +1136,7 @@ $$('.nav-item').forEach(t => {
 });
 
 /* ============================================================
-   BOOT
+   启动
    ============================================================ */
 refreshStatus();
 setInterval(refreshStatus, 6000);

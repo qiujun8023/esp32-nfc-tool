@@ -131,7 +131,7 @@ esp_err_t ndef_parse(const ntag_dump_t* dump, ndef_record_t* out) {
         return ESP_OK;
     }
 
-    ESP_LOGW(TAG, "unsupported NDEF: TNF=%d type_len=%d", tnf, type_len);
+    ESP_LOGW(TAG, "unsupported ndef: tnf=%d type_len=%d", tnf, type_len);
     return ESP_ERR_NOT_SUPPORTED;
 }
 
@@ -184,7 +184,6 @@ static esp_err_t write_ndef_message(const uint8_t* msg, size_t msg_len) {
         }
     }
 
-    ESP_LOGI(TAG, "NDEF message written, %d bytes", (int)pos);
     return ESP_OK;
 }
 

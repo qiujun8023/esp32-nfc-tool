@@ -72,16 +72,6 @@ static void IRAM_ATTR spi_post_cb(spi_transaction_t* t) {
     gpio_set_level(PN532_SPI_SS, 1);
 }
 
-/* -------- 调试 -------- */
-
-static void hexdump(const char* label, const uint8_t* d, size_t n) {
-    char buf[3 * 32 + 1];
-    size_t k = (n > 32) ? 32 : n;
-    for (size_t i = 0; i < k; i++) snprintf(buf + i * 3, 4, "%02x ", d[i]);
-    buf[k * 3] = 0;
-    ESP_LOGI(TAG, "%s[%d]: %s", label, (int)n, buf);
-}
-
 /* -------- SPI 传输（全双工，opcode 作为 tx 首字节） -------- */
 
 /**
@@ -163,7 +153,6 @@ static esp_err_t send_command(const uint8_t* cmd, uint8_t cmd_len) {
     frame[i++] = (uint8_t)(~sum + 1);  // DCS
     frame[i++] = PN532_POSTAMBLE;
 
-    hexdump("tx", frame, i);
     return spi_write_data(frame, i);
 }
 
@@ -192,7 +181,6 @@ static esp_err_t read_ack(uint32_t timeout_ms) {
     err = spi_read_data(buf, 6);
     if (err != ESP_OK) return err;
 
-    hexdump("ack", buf, 6);
     if (memcmp(buf, ACK_FRAME, 6) != 0) {
         ESP_LOGW(TAG, "ack mismatch");
         return ESP_FAIL;
@@ -218,8 +206,6 @@ static esp_err_t read_response(uint8_t expected_cmd, uint8_t* data, uint8_t* dat
     err = spi_read_data(buf, max_read);
     if (err != ESP_OK) return err;
 
-    hexdump("rx", buf, max_read > 20 ? 20 : max_read);
-
     /* 验证帧头 */
     if (buf[0] != 0x00 || buf[1] != 0x00 || buf[2] != 0xFF) {
         ESP_LOGW(TAG, "bad frame header: %02x %02x %02x", buf[0], buf[1], buf[2]);
@@ -227,13 +213,13 @@ static esp_err_t read_response(uint8_t expected_cmd, uint8_t* data, uint8_t* dat
     }
     uint8_t len = buf[3];
     if ((uint8_t)(len + buf[4]) != 0) {
-        ESP_LOGW(TAG, "bad LCS: len=%02x lcs=%02x", len, buf[4]);
+        ESP_LOGW(TAG, "bad lcs: len=%02x lcs=%02x", len, buf[4]);
         return ESP_FAIL;
     }
 
     /* 验证 TFI + CMD */
     if (buf[5] != PN532_PN532TOHOST || buf[6] != expected_cmd) {
-        ESP_LOGW(TAG, "unexpected: TFI=%02x CMD=%02x (expected %02x)",
+        ESP_LOGW(TAG, "unexpected: tfi=%02x cmd=%02x (expected %02x)",
                  buf[5], buf[6], expected_cmd);
         return ESP_FAIL;
     }
@@ -266,7 +252,6 @@ static esp_err_t cmd_xfer(const uint8_t* cmd, uint8_t cmd_len, uint8_t* rx, uint
 /* -------- 唤醒 -------- */
 
 static void spi_wakeup(void) {
-    ESP_LOGI(TAG, "PN532 SPI wakeup (CS low 2ms)...");
     gpio_set_level(PN532_SPI_SS, 0);
     vTaskDelay(pdMS_TO_TICKS(3));   // CS low ≥2ms
     gpio_set_level(PN532_SPI_SS, 1);
@@ -317,7 +302,7 @@ esp_err_t pn532_init(void) {
     };
     ESP_ERROR_CHECK(spi_bus_add_device(PN532_SPI_HOST, &dev, &s_spi));
 
-    ESP_LOGI(TAG, "SPI init: SCK=%d MISO=%d MOSI=%d SS=%d freq=%dHz",
+    ESP_LOGI(TAG, "spi init: sck=%d miso=%d mosi=%d ss=%d freq=%dhz",
              PN532_SPI_SCK, PN532_SPI_MISO, PN532_SPI_MOSI, PN532_SPI_SS, PN532_SPI_FREQ);
 
     /* 上电等待 */
@@ -332,16 +317,16 @@ esp_err_t pn532_init(void) {
     uint8_t rx_len   = sizeof(rx);
     esp_err_t err    = cmd_xfer(fw_cmd, 1, rx, &rx_len, 1000);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "FW version failed: %s, retry after wakeup", esp_err_to_name(err));
+        ESP_LOGW(TAG, "fw version failed: %s, retry after wakeup", esp_err_to_name(err));
         spi_wakeup();
         rx_len = sizeof(rx);
         err = cmd_xfer(fw_cmd, 1, rx, &rx_len, 1000);
     }
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "PN532 not responding: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "pn532 not responding: %s", esp_err_to_name(err));
         return err;
     }
-    ESP_LOGI(TAG, "PN532 firmware: IC=0x%02x Ver=%d.%d Rev=%d",
+    ESP_LOGI(TAG, "pn532 firmware: ic=0x%02x ver=%d.%d rev=%d",
              rx[0], rx[1], rx[2], rx[3]);
 
     /* SAMConfiguration: normal mode, no timeout, no IRQ */
@@ -349,11 +334,11 @@ esp_err_t pn532_init(void) {
     rx_len = sizeof(rx);
     err = cmd_xfer(sam, sizeof(sam), rx, &rx_len, 500);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "SAMConfig failed: %s", esp_err_to_name(err));
+        ESP_LOGE(TAG, "samconfig failed: %s", esp_err_to_name(err));
         return err;
     }
 
-    ESP_LOGI(TAG, "PN532 ready (SPI)");
+    ESP_LOGI(TAG, "pn532 ready (spi)");
     return ESP_OK;
 }
 

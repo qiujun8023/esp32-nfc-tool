@@ -9,8 +9,6 @@
 #include "config.h"
 #include "dump_store.h"
 #include "esp_log.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "http_server.h"
 #include "keys_store.h"
 #include "nvs_flash.h"
@@ -35,13 +33,10 @@ void app_main(void) {
     captive_dns_start();
 
     if (pn532_init() != ESP_OK) {
-        ESP_LOGW(TAG, "PN532 init failed (检查接线/拨码开关是否切到 SPI 模式)");
-    } else {
-        uint32_t fw = pn532_get_firmware_version();
-        ESP_LOGI(TAG, "PN532 firmware: 0x%08lx", (unsigned long)fw);
+        ESP_LOGW(TAG, "pn532 init failed (check wiring / dip switch on spi mode)");
     }
 
     http_server_start();
 
-    ESP_LOGI(TAG, "ready, connect to AP \"%s\" then open http://nfc.local/", WIFI_AP_SSID);
+    ESP_LOGI(TAG, "ready, connect to ap \"%s\" then open http://nfc.local/", WIFI_AP_SSID);
 }

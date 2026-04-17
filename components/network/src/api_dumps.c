@@ -499,5 +499,5 @@ void api_dumps_register(httpd_handle_t srv) {
     httpd_register_uri_handler(srv, &u_detail);
     httpd_register_uri_handler(srv, &u_del);
     httpd_register_uri_handler(srv, &u_rename);
-    ESP_LOGI(TAG, "Dumps API registered");
+    ESP_LOGI(TAG, "dumps api registered");
 }

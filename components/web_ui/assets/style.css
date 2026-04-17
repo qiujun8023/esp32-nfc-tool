@@ -45,7 +45,7 @@ body {
   padding-bottom: calc(60px + env(safe-area-inset-bottom));
 }
 
-/* ===== Header ===== */
+/* ===== 头部 ===== */
 #header {
   position: fixed;
   top: 0; left: 0; right: 0;
@@ -101,7 +101,7 @@ body {
   line-height: 1;
 }
 
-/* ===== Nav ===== */
+/* ===== 底部导航 ===== */
 #nav {
   position: fixed;
   bottom: 0; left: 0; right: 0;
@@ -148,7 +148,7 @@ body {
   border-radius: 0 0 2px 2px;
 }
 
-/* ===== Main ===== */
+/* ===== 主区域 ===== */
 #app {
   padding: 16px;
   min-height: calc(100dvh - 52px - 60px);
@@ -160,7 +160,7 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ===== Page Header ===== */
+/* ===== 页面标题 ===== */
 .pg-title {
   font-size: 20px;
   font-weight: 700;
@@ -174,7 +174,7 @@ body {
   margin-bottom: 20px;
 }
 
-/* ===== Scan Page ===== */
+/* ===== 扫描页 ===== */
 .scan-hero {
   display: flex;
   flex-direction: column;
@@ -254,7 +254,7 @@ body {
   to { transform: rotate(360deg); }
 }
 
-/* Card info after scan */
+/* 扫描后卡片信息 */
 .card-info {
   margin-top: 24px;
   width: 100%;
@@ -307,7 +307,7 @@ body {
   background: var(--amber-dim);
 }
 
-/* Action grid */
+/* 操作按钮网格 */
 .action-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -351,7 +351,7 @@ body {
 .act-btn.primary svg { color: #000; }
 .act-btn.full { grid-column: 1 / -1; }
 
-/* NDEF section */
+/* NDEF 区块 */
 .ndef-section {
   margin-top: 16px;
   background: var(--surface);
@@ -400,7 +400,7 @@ body {
 
 .form-row:last-child { margin-bottom: 0; }
 
-/* ===== Progress Panel ===== */
+/* ===== 进度面板 ===== */
 .progress-panel {
   margin-top: 16px;
   background: var(--surface);
@@ -480,7 +480,7 @@ body {
 .log-box .ok { color: var(--cyan); }
 .log-box .err { color: var(--red); }
 
-/* ===== Library Page ===== */
+/* ===== 卡库页 ===== */
 .lib-toolbar {
   display: flex;
   gap: 8px;
@@ -583,7 +583,7 @@ body {
 .dump-act.write-act { color: var(--amber); font-weight: 600; }
 .dump-act.del-act { color: var(--red); }
 
-/* ===== Library Detail Subpage ===== */
+/* ===== 卡库详情子页 ===== */
 .detail-topbar {
   display: flex;
   align-items: center;
@@ -748,7 +748,7 @@ details.detail-sector[open] > summary.detail-hdr::before { content: '▾ '; }
   color: var(--text3);
 }
 
-/* ===== Keys Page ===== */
+/* ===== 密钥页 ===== */
 .key-section { margin-bottom: 24px; }
 
 .key-section-title {
@@ -798,7 +798,7 @@ details.detail-sector[open] > summary.detail-hdr::before { content: '▾ '; }
   margin-top: 12px;
 }
 
-/* ===== Settings Page ===== */
+/* ===== 设置页 ===== */
 .info-card {
   background: var(--surface);
   border: 1px solid var(--border2);
@@ -847,7 +847,7 @@ details.detail-sector[open] > summary.detail-hdr::before { content: '▾ '; }
   margin-top: 12px;
 }
 
-/* ===== Common Form Elements ===== */
+/* ===== 通用表单元素 ===== */
 .input {
   height: 40px;
   background: var(--bg2);
@@ -907,7 +907,7 @@ details.detail-sector[open] > summary.detail-hdr::before { content: '▾ '; }
 .btn.full { width: 100%; }
 .btn.flex1 { flex: 1; }
 
-/* ===== Toast ===== */
+/* ===== Toast 提示 ===== */
 .toast {
   position: fixed;
   bottom: 80px;
@@ -940,7 +940,7 @@ details.detail-sector[open] > summary.detail-hdr::before { content: '▾ '; }
 .toast.error { border-color: var(--red); }
 .toast.ok { border-color: var(--cyan); }
 
-/* ===== Modal ===== */
+/* ===== 模态框 ===== */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -1014,7 +1014,7 @@ details.detail-sector[open] > summary.detail-hdr::before { content: '▾ '; }
   font-weight: 600;
 }
 
-/* Import dialog */
+/* 导入对话框 */
 .modal-title {
   font-size: 16px;
   font-weight: 600;
@@ -1069,7 +1069,7 @@ details.detail-sector[open] > summary.detail-hdr::before { content: '▾ '; }
   color: var(--text);
 }
 
-/* Write progress subpage */
+/* 写入进度子页 */
 .btn.cancel-btn-wide {
   background: var(--amber-dim);
   color: var(--amber);
@@ -1077,18 +1077,18 @@ details.detail-sector[open] > summary.detail-hdr::before { content: '▾ '; }
   font-weight: 600;
 }
 
-/* ===== Scrollbar ===== */
+/* ===== 滚动条 ===== */
 ::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
 
-/* ===== Utilities ===== */
+/* ===== 工具类 ===== */
 .hidden { display: none !important; }
 .mt8 { margin-top: 8px; }
 .mt12 { margin-top: 12px; }
 .mt16 { margin-top: 16px; }
 
-/* ===== Reduced Motion ===== */
+/* ===== 减少动效 ===== */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0ms !important;

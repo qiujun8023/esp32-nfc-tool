@@ -100,5 +100,5 @@ void api_keys_register(httpd_handle_t srv) {
     httpd_register_uri_handler(srv, &u_get);
     httpd_register_uri_handler(srv, &u_post);
     httpd_register_uri_handler(srv, &u_del);
-    ESP_LOGI(TAG, "Keys API registered");
+    ESP_LOGI(TAG, "keys api registered");
 }

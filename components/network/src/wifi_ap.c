@@ -90,5 +90,5 @@ void wifi_ap_start(void) {
         mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
     }
 
-    ESP_LOGI(TAG, "softAP up: ssid=%s channel=%d", WIFI_AP_SSID, WIFI_AP_CHANNEL);
+    ESP_LOGI(TAG, "softap up: ssid=%s channel=%d", WIFI_AP_SSID, WIFI_AP_CHANNEL);
 }

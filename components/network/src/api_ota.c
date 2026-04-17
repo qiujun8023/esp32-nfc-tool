@@ -29,7 +29,7 @@ static esp_err_t handle_ota(httpd_req_t* req) {
         return httpd_resp_sendstr(req, "{\"ok\":false,\"err\":\"找不到 OTA 分区\"}");
     }
 
-    ESP_LOGI(TAG, "OTA start: partition=%s size=%u", update->label, (unsigned)total);
+    ESP_LOGI(TAG, "ota start: partition=%s size=%u", update->label, (unsigned)total);
 
     esp_ota_handle_t ota_handle;
     esp_err_t err = esp_ota_begin(update, total, &ota_handle);
@@ -72,7 +72,7 @@ static esp_err_t handle_ota(httpd_req_t* req) {
         return httpd_resp_sendstr(req, "{\"ok\":false,\"err\":\"设置启动分区失败\"}");
     }
 
-    ESP_LOGI(TAG, "OTA done, rebooting...");
+    ESP_LOGI(TAG, "ota done, rebooting");
     httpd_resp_set_type(req, "application/json");
     httpd_resp_sendstr(req, "{\"ok\":true,\"msg\":\"固件更新完成，即将重启\"}");
 
@@ -85,5 +85,5 @@ static esp_err_t handle_ota(httpd_req_t* req) {
 void api_ota_register(httpd_handle_t srv) {
     httpd_uri_t u_ota = {.uri = "/api/ota", .method = HTTP_POST, .handler = handle_ota};
     httpd_register_uri_handler(srv, &u_ota);
-    ESP_LOGI(TAG, "OTA API registered");
+    ESP_LOGI(TAG, "ota api registered");
 }

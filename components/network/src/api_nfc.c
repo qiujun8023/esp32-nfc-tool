@@ -233,11 +233,19 @@ static void task_full_write(void* arg) {
         goto done;
     }
     uint8_t verify_fails = 0;
-    mfc_full_write(dump, mfc_progress, a->task_id, &verify_fails);
+    esp_err_t werr = mfc_full_write(dump, mfc_progress, a->task_id, &verify_fails);
+    free(dump);
+    if (werr == ESP_ERR_TIMEOUT) {
+        ws_progress_error(a->task_id, "已取消");
+        goto done;
+    }
+    if (werr == ESP_ERR_NOT_FOUND) {
+        ws_progress_error(a->task_id, "卡被拿走，写入中断");
+        goto done;
+    }
     char result[96];
     snprintf(result, sizeof(result), "{\"ok\":true,\"verifyFails\":%d}", verify_fails);
     ws_progress_done(a->task_id, result);
-    free(dump);
 done:
     free(a);
     xSemaphoreGive(s_busy);
@@ -383,5 +391,5 @@ void api_nfc_register(httpd_handle_t srv) {
     httpd_register_uri_handler(srv, &u_ndef_r);
     httpd_register_uri_handler(srv, &u_ndef_w);
     httpd_register_uri_handler(srv, &u_cancel);
-    ESP_LOGI(TAG, "NFC API registered");
+    ESP_LOGI(TAG, "nfc api registered");
 }

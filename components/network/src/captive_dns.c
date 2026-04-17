@@ -71,5 +71,5 @@ static void dns_task(void* arg) {
 
 void captive_dns_start(void) {
     xTaskCreate(dns_task, "captive_dns", 3072, NULL, 4, NULL);
-    ESP_LOGI(TAG, "captive DNS started");
+    ESP_LOGI(TAG, "captive dns started");
 }

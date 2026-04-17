@@ -85,7 +85,6 @@ mfc_magic_type_t mfc_detect_magic(void) {
         uint8_t cmd43[] = {0x43};
         rx_len = sizeof(rx);
         if (pn532_in_data_exchange(cmd43, 1, rx, &rx_len, 200) == ESP_OK) {
-            ESP_LOGI(TAG, "Gen1a magic card detected");
             return MFC_MAGIC_GEN1A;
         }
     }
@@ -148,7 +147,7 @@ esp_err_t mfc_full_read(const pn532_target_t* target,
             if (nfc_cancel_pending()) return ESP_ERR_TIMEOUT;
             try_res_t r = try_key(target, first, MFC_KEY_A, keys[k]);
             if (r == TRY_CARD_LOST) {
-                ESP_LOGW(TAG, "card lost at sector %u (key A)", s);
+                ESP_LOGW(TAG, "card lost at sector %u (key a)", s);
                 return ESP_ERR_NOT_FOUND;
             }
             if (r == TRY_OK) {
@@ -170,7 +169,7 @@ esp_err_t mfc_full_read(const pn532_target_t* target,
             if (nfc_cancel_pending()) return ESP_ERR_TIMEOUT;
             try_res_t r = try_key(target, first, MFC_KEY_B, keys[k]);
             if (r == TRY_CARD_LOST) {
-                ESP_LOGW(TAG, "card lost at sector %u (key B)", s);
+                ESP_LOGW(TAG, "card lost at sector %u (key b)", s);
                 return ESP_ERR_NOT_FOUND;
             }
             if (r == TRY_OK) {
@@ -198,7 +197,6 @@ esp_err_t mfc_full_read(const pn532_target_t* target,
         if (cb) cb(s, dump->sector_count, dump->key_a[s].found, dump->key_b[s].found, user);
     }
 
-    ESP_LOGI(TAG, "full read done, sectors=%d", dump->sector_count);
     return ESP_OK;
 }
 

@@ -90,7 +90,6 @@ esp_err_t ntag_full_read(const pn532_target_t* tgt, ntag_dump_t* dump) {
             }
         }
     }
-    ESP_LOGI(TAG, "ntag dump done, type=%d pages=%d", dump->type, dump->total_pages);
     return ESP_OK;
 }
 

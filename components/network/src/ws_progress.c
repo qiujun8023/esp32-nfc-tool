@@ -8,9 +8,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "esp_log.h"
-
-static const char* TAG = "ws";
 static httpd_handle_t s_srv = NULL;
 
 #define WS_MAX_FDS         16
@@ -22,7 +19,6 @@ void ws_progress_init(httpd_handle_t srv) {
 
 esp_err_t ws_progress_handler(httpd_req_t* req) {
     if (req->method == HTTP_GET) {
-        ESP_LOGI(TAG, "ws client connected");
         return ESP_OK;
     }
     // 收到帧（不处理客户端消息，丢弃）

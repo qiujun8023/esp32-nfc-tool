@@ -1,6 +1,6 @@
 /*
- * 全局只允许一个 NFC 任务同时运行;用 binary semaphore 而非 mutex 是因为
- * HTTP 任务 take、后台任务 give,不符合 mutex 所有权协议。
+ * 全局只允许一个 NFC 任务同时运行；用 binary semaphore 而非 mutex 是因为
+ * HTTP 任务 take、后台任务 give，不符合 mutex 所有权协议。
  */
 
 #include <stdio.h>

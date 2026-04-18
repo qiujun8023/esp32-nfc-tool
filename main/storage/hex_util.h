@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// out 缓冲区至少 len*2 + 1 字节 (含结尾 \0)
+// out 缓冲区至少 len*2 + 1 字节（含结尾 \0）
 void hex_encode_upper(const uint8_t* in, size_t len, char* out);
 void hex_encode_lower(const uint8_t* in, size_t len, char* out);
 

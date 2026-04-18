@@ -13,7 +13,7 @@ typedef enum {
 } dump_type_t;
 
 typedef struct {
-    char        id[40];   // 同时充当 URL 路径段与文件名 (无扩展名)
+    char        id[40];   // 同时充当 URL 路径段与文件名（无扩展名）
     char        name[64]; // 用户备注
     dump_type_t type;
     uint8_t     uid[10];
@@ -29,7 +29,7 @@ typedef struct {
 
 esp_err_t dump_store_init(void);
 
-// created_ms<=0 表示未知 (设备无 RTC)
+// created_ms<=0 表示未知（设备无 RTC）
 esp_err_t dump_store_save_mfc(const mfc_dump_t* d, const char* name, int64_t created_ms, char out_id[40]);
 esp_err_t dump_store_save_ntag(const ntag_dump_t* d, const pn532_target_t* tgt, const char* name, int64_t created_ms, char out_id[40]);
 

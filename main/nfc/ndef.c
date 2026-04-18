@@ -1,11 +1,11 @@
 /*
  * NFC Forum Type 2 Tag (NTAG) NDEF 解析/构建。
  *
- * NTAG 内存布局:
+ * NTAG 内存布局：
  *   page 0-1: UID
  *   page 2:   lock bytes
  *   page 3:   CC (Capability Container)
- *   page 4+:  用户数据,NDEF TLV 从此开始
+ *   page 4+:  用户数据，NDEF TLV 从此开始
  *
  * TLV:
  *   0x00 = NULL TLV (跳过)
@@ -139,7 +139,7 @@ esp_err_t ndef_parse(const ntag_dump_t* dump, ndef_record_t* out) {
     return ESP_ERR_NOT_SUPPORTED;
 }
 
-// 贪婪匹配最长前缀,减少写入字节数(表里 https://www. 要比 https:// 优先)
+// 贪婪匹配最长前缀，减少写入字节数（表里 https://www. 要比 https:// 优先）
 static uint8_t match_uri_prefix(const char* uri, size_t* prefix_len) {
     uint8_t best = 0;
     size_t  best_len = 0;
@@ -154,7 +154,7 @@ static uint8_t match_uri_prefix(const char* uri, size_t* prefix_len) {
     return best;
 }
 
-// 各型号用户区最后一页(含),越过此页会进入 lock/config/PWD 区,写错可能永久锁卡
+// 各型号用户区最后一页（含），越过此页会进入 lock/config/PWD 区，写错可能永久锁卡
 static uint8_t user_data_last_page(ntag_type_t t) {
     switch (t) {
         case NTAG_213: return 39;

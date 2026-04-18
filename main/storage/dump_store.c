@@ -1,6 +1,6 @@
 /*
- * 每个 dump 对应两个文件: <counter>_<uid_hex>.bin (原始数据) + .json (元数据)。
- * counter 存在 NVS "dump_cnt" 命名空间,单调自增,用来保证文件名唯一并可按时间排序。
+ * 每个 dump 对应两个文件：<counter>_<uid_hex>.bin（原始数据）+ .json（元数据）。
+ * counter 存在 NVS "dump_cnt" 命名空间，单调自增，用来保证文件名唯一并可按时间排序。
  */
 
 #include "dump_store.h"
@@ -76,7 +76,7 @@ static void path_for(char* out, size_t outlen, const char* id, const char* ext) 
     snprintf(out, outlen, "%s/%s.%s", DUMPS_DIR, id, ext);
 }
 
-// 部分写入 (flash 满 / 断电重试) 会留下半截文件导致 list 出问题, 所以失败必删
+// 部分写入（flash 满 / 断电重试）会留下半截文件导致 list 出问题，所以失败必删
 static esp_err_t write_bin(const char* id, const void* data, size_t len) {
     char path[128];
     path_for(path, sizeof(path), id, "bin");
@@ -133,7 +133,7 @@ static esp_err_t write_meta_json(const char* id, const dump_meta_t* m) {
     return ESP_OK;
 }
 
-// 单独扫描而不是复用 dump_store_list,避免一次性分配 128 条元数据 (约 30KB)
+// 单独扫描而不是复用 dump_store_list，避免一次性分配 128 条元数据（约 30 KB）
 static bool find_existing_by_uid_type(const uint8_t* uid, uint8_t uid_len, dump_type_t type,
                                       char out_id[40], char out_name[64]) {
     DIR* d = opendir(DUMPS_DIR);
@@ -159,8 +159,8 @@ static bool find_existing_by_uid_type(const uint8_t* uid, uint8_t uid_len, dump_
 }
 
 /*
- * upd 覆盖 base, upd 没读到的保留 base;这样两次扫描不同 key 的扇区可以累积。
- * 合并完再把 key 写回 trailer 镜像,否则下次 load 的 recover 流程会丢失信息。
+ * upd 覆盖 base，upd 没读到的保留 base；这样两次扫描不同 key 的扇区可以累积。
+ * 合并完再把 key 写回 trailer 镜像，否则下次 load 的 recover 流程会丢失信息。
  */
 static void merge_mfc_into(mfc_dump_t* base, const mfc_dump_t* upd) {
     // atqa/sak/uid 以最新一次扫描为准

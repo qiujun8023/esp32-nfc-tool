@@ -16,7 +16,7 @@ esp_err_t ws_progress_handler(httpd_req_t* req) {
     if (req->method == HTTP_GET) {
         return ESP_OK;
     }
-    // 单向广播,客户端发来的帧一律丢弃(但必须 recv 掉以免占用 httpd buffer)
+    // 单向广播，客户端发来的帧一律丢弃（但必须 recv 掉以免占用 httpd buffer）
     httpd_ws_frame_t f   = {0};
     esp_err_t        err = httpd_ws_recv_frame(req, &f, 0);
     if (err != ESP_OK) return err;

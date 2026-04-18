@@ -185,7 +185,7 @@ function wsConnect() {
     S.ws = null;
     $('#statusDot').classList.remove('online');
     const hs = $('#hdrState'); if (hs) hs.textContent = '离线';
-    addLog('[WS] 断开，3s 后重连', 'err');
+    addLog('[WS] 断开，3 s 后重连', 'err');
     setTimeout(wsConnect, 3000);
   };
   ws.onerror = () => { try { ws.close(); } catch (e) {} };
@@ -805,7 +805,7 @@ async function handleDumpDetailAction(ev) {
 
   } else if (act === 'write') {
     if (S.busy) { toast('操作进行中', 'error'); return; }
-    const warn = '把 Dump 写回当前贴近的卡？\n普通卡 Block 0 (UID) 不会被改写，其余块按已知密钥覆盖。';
+    const warn = '把 Dump 写回当前贴近的卡？\n普通卡 Block 0（UID）不会被改写，其余块按已知密钥覆盖。';
     const ok = await confirm2(warn);
     if (!ok) return;
     S.sectors = [];
@@ -919,9 +919,9 @@ function renderNtagDetail(r) {
   ).join('');
   return (
     '<div class="detail-sector">' +
-      '<div class="detail-hdr">' + esc(typeName) + ' | ' + r.totalPages + ' 页 | 用户区 ' + r.userBytes + 'B | UID ' + esc(r.uid || '') + '</div>' +
+      '<div class="detail-hdr">' + esc(typeName) + ' | ' + r.totalPages + ' 页 | 用户区 ' + r.userBytes + ' B | UID ' + esc(r.uid || '') + '</div>' +
       '<div class="detail-block"><span>CC</span><span class="detail-badge">magic ' + esc(cc.magic || '') +
-        (cc.magicOk ? ' ✓' : ' ✗') + ' | ver ' + esc(cc.version || '') + ' | size ' + (cc.sizeBytes || 0) + 'B | access ' + esc(cc.access || '') + '</span></div>' +
+        (cc.magicOk ? ' ✓' : ' ✗') + ' | ver ' + esc(cc.version || '') + ' | size ' + (cc.sizeBytes || 0) + ' B | access ' + esc(cc.access || '') + '</span></div>' +
       '<div class="detail-block"><span>静态锁</span><span class="detail-badge mono">' + esc(r.lock || '') + '</span></div>' +
       '<div class="detail-block"><span>NDEF</span><span>' + ndefHtml + '</span></div>' +
     '</div>' +
@@ -1024,12 +1024,12 @@ function renderSettings() {
       '<div class="info-row"><span class="info-k">空闲堆</span><span class="info-v">' + esc(fmtBytes(s.freeHeap || 0)) + '</span></div>' +
       '<div class="info-row"><span class="info-k">存储</span><span class="info-v">' +
         esc(fmtBytes(s.fsUsed || 0)) + ' / ' + esc(fmtBytes(s.fsTotal || 0)) +
-        ' <span style="color:var(--text3)">(剩 ' + esc(free) + ')</span>' +
+        ' <span style="color:var(--text3)">（剩 ' + esc(free) + '）</span>' +
       '</span></div>' +
     '</div>' +
 
     '<div class="ota-section">' +
-      '<div class="key-section-title">固件更新 (OTA)</div>' +
+      '<div class="key-section-title">固件更新（OTA）</div>' +
       '<div class="ota-hint">选择编译好的 .bin 固件，更新后设备自动重启</div>' +
       '<input type="file" id="otaFile" accept=".bin" class="hidden">' +
       '<button class="btn primary full" id="otaBtn">选择固件文件</button>' +

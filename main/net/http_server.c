@@ -18,8 +18,8 @@
 static const char* TAG = "http";
 
 /*
- * captive portal 客户端状态跟踪: 用环形数组记录已加载过主页的客户端 IP,
- * 之后这些 IP 的系统连通性探测会被回复为成功,浏览器不再弹 captive 页。
+ * captive portal 客户端状态跟踪：用环形数组记录已加载过主页的客户端 IP，
+ * 之后这些 IP 的系统连通性探测会被回复为成功，浏览器不再弹 captive 页。
  */
 static uint32_t          s_portal_done[CONFIG_ESP_MAX_STA_CONN];
 static uint8_t           s_portal_count = 0;
@@ -94,8 +94,8 @@ static esp_err_t handle_style_css(httpd_req_t* req) {
 }
 
 /*
- * 对已加载过主页的客户端,返回各平台期望的"有网络"响应,
- * 否则系统会认定为 captive portal 未通过 / 无网络,自动断开 Wi-Fi。
+ * 对已加载过主页的客户端，返回各平台期望的「有网络」响应，
+ * 否则系统会认定为 captive portal 未通过 / 无网络，自动断开 Wi-Fi。
  */
 static esp_err_t reply_connectivity_success(httpd_req_t* req) {
     const char* uri = req->uri;

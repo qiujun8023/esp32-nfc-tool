@@ -23,7 +23,7 @@ typedef struct {
 
 esp_err_t pn532_init(void);
 
-// 成功返回 32 位版本号(ic<<24|ver<<16|..),失败返回 0
+// 成功返回 32 位版本号（ic<<24|ver<<16|..），失败返回 0
 uint32_t pn532_get_firmware_version(void);
 
 // InListPassiveTarget, timeout 内未发现卡返回 ESP_ERR_TIMEOUT

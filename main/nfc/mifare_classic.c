@@ -94,8 +94,8 @@ typedef enum {
 } try_res_t;
 
 /*
- * Mifare 认证失败后卡进入 halted 状态,下一次 auth 前必须 re-select。
- * re-select 偶发超时(RF/时序抖动),静默跳过会让正确的 key 永远试不到,所以最多重试 3 次;
+ * Mifare 认证失败后卡进入 halted 状态，下一次 auth 前必须 re-select。
+ * re-select 偶发超时（RF/时序抖动），静默跳过会让正确的 key 永远试不到，所以最多重试 3 次；
  * 都失败才认定 CARD_LOST。
  */
 static try_res_t try_key(const pn532_target_t* tgt, uint8_t block, mfc_key_type_t kt, const uint8_t* key) {
@@ -173,7 +173,7 @@ esp_err_t mfc_full_read(const pn532_target_t* target,
             if ((k & 0x0F) == 0) vTaskDelay(pdMS_TO_TICKS(1));
         }
 
-        // trailer 读出时 key A 恒为 0、key B 可能被屏蔽,用已知 key 填回,便于写回流程
+        // trailer 读出时 key A 恒为 0、key B 可能被屏蔽，用已知 key 填回，便于写回流程
         if (dump->key_a[s].found || dump->key_b[s].found) {
             uint8_t* trailer = dump->data[first + blocks - 1];
             if (dump->key_a[s].found) memcpy(trailer, dump->key_a[s].key, MFC_KEY_LEN);

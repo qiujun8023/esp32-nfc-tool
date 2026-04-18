@@ -1,13 +1,13 @@
 /*
- * PN532 SPI 驱动。关键点:
- *  - ESP32-C3 半双工模式不支持同事务 TX+RX,必须用全双工 + LSB-first
- *  - PN532 SPI 前端要求 LSB-first (和 HSU 不同),opcode 也是这个字序
- *  - opcode 作为 tx_buffer 首字节;读时丢弃 rx_buffer[0],有效数据从 [1] 开始
- *  - CS 手动控制,拉低后必须等 >= 2µs 才发首字节(这里留了 100µs)
+ * PN532 SPI 驱动，关键点：
+ *  - ESP32-C3 半双工模式不支持同事务 TX+RX，必须用全双工 + LSB-first
+ *  - PN532 SPI 前端要求 LSB-first（和 HSU 不同），opcode 也是这个字序
+ *  - opcode 作为 tx_buffer 首字节；读时丢弃 rx_buffer[0]，有效数据从 [1] 开始
+ *  - CS 手动控制，拉低后必须等 >= 2µs 才发首字节（这里留了 100µs）
  *
  * SPI opcode:
  *  - 0x01 write: TX=[0x01, 帧...]
- *  - 0x02 status: TX=[0x02,0x00] RX=[xx,status],status bit0=1 表示就绪
+ *  - 0x02 status: TX=[0x02,0x00] RX=[xx,status]，status bit0=1 表示就绪
  *  - 0x03 read: TX=[0x03,0...] RX=[xx, 帧...]
  *
  * 正常帧: 00 00 FF LEN LCS TFI DATA... DCS 00
@@ -260,7 +260,7 @@ esp_err_t pn532_init(void) {
     };
     ESP_ERROR_CHECK(spi_bus_add_device(PN532_SPI_HOST, &dev, &s_spi));
 
-    ESP_LOGI(TAG, "spi init sck=%d miso=%d mosi=%d ss=%d freq=%dhz",
+    ESP_LOGD(TAG, "spi init sck=%d miso=%d mosi=%d ss=%d freq=%dhz",
              PN532_SPI_SCK, PN532_SPI_MISO, PN532_SPI_MOSI, PN532_SPI_SS, PN532_SPI_FREQ);
 
     // 给模块一点上电时间再发命令,避免首次 GET_FW_VERSION 失败

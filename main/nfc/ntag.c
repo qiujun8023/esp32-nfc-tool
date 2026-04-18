@@ -12,6 +12,9 @@ static const char* TAG = "ntag";
 #define NTAG_CMD_WRITE       0xA2
 #define NTAG_CMD_GET_VERSION 0x60
 
+// 连续读/写失败超过此值则认定卡已离开感应区
+#define NTAG_CONSECUTIVE_FAIL_MAX 4
+
 ntag_type_t ntag_detect_type(void) {
     uint8_t tx[]   = {NTAG_CMD_GET_VERSION};
     uint8_t rx[16] = {0};
@@ -72,7 +75,7 @@ esp_err_t ntag_full_read(const pn532_target_t* tgt, ntag_dump_t* dump) {
             dump->page_read[p] = true;
             consecutive_fail = 0;
         } else {
-            if (++consecutive_fail >= 4) {
+            if (++consecutive_fail >= NTAG_CONSECUTIVE_FAIL_MAX) {
                 ESP_LOGW(TAG, "ntag: 4 consecutive page reads failed at %u, assume card lost", p);
                 return ESP_ERR_NOT_FOUND;
             }
@@ -93,7 +96,7 @@ esp_err_t ntag_full_write(const ntag_dump_t* dump) {
         if (ntag_write_page((uint8_t)p, dump->pages[p]) == ESP_OK) {
             consecutive_fail = 0;
         } else {
-            if (++consecutive_fail >= 4) {
+            if (++consecutive_fail >= NTAG_CONSECUTIVE_FAIL_MAX) {
                 ESP_LOGW(TAG, "ntag: 4 consecutive page writes failed at %u, assume card lost", p);
                 return ESP_ERR_NOT_FOUND;
             }

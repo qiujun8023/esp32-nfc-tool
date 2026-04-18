@@ -28,8 +28,8 @@ static esp_err_t send_err(httpd_req_t* req, const char* err) {
 }
 
 /*
- * httpd_uri_match_wildcard 只认尾部 '*'，因此把动作名放在 id 前:
- *   /api/dumps/detail/<id>、/api/dumps/bin/<id>;
+ * httpd_uri_match_wildcard 只认尾部 '*'，因此把动作名放在 id 前：
+ *   /api/dumps/detail/<id>、/api/dumps/bin/<id>；
  *   DELETE/PATCH 才能继续用 /api/dumps/<id>。
  */
 static bool extract_id_after(httpd_req_t* req, const char* prefix, char* out, size_t outlen) {
@@ -226,11 +226,11 @@ static esp_err_t handle_upload(httpd_req_t* req) {
 }
 
 /*
- * 解码 sector trailer byte 6/7/8 中的 access bits (每 block 3 bit)。
+ * 解码 sector trailer byte 6/7/8 中的 access bits（每 block 3 bit）。
  *   byte 6: !C2_3 !C2_2 !C2_1 !C2_0  !C1_3 !C1_2 !C1_1 !C1_0
  *   byte 7:  C1_3  C1_2  C1_1  C1_0  !C3_3 !C3_2 !C3_1 !C3_0
  *   byte 8:  C3_3  C3_2  C3_1  C3_0   C2_3  C2_2  C2_1  C2_0
- * 这里只取非反码位,byte 6 仅用于完整性,不参与解码。
+ * 这里只取非反码位，byte 6 仅用于完整性，不参与解码。
  */
 static void decode_access_bits(uint8_t b6, uint8_t b7, uint8_t b8, uint8_t c[4]) {
     (void)b6;

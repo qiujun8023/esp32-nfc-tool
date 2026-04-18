@@ -9,7 +9,7 @@
 
 static const char* TAG = "captive_dns";
 
-/* DNS 报文头字段偏移(RFC1035 4.1.1):flags=2-3,ancount=6-7 */
+/* DNS 报文头字段偏移（RFC1035 4.1.1）：flags=2-3，ancount=6-7 */
 #define DNS_HDR_LEN      12
 #define DNS_FLAGS_HI     2
 #define DNS_FLAGS_LO     3

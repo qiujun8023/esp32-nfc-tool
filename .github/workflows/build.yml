@@ -20,7 +20,7 @@ jobs:
           path: "."
           command: >-
             idf.py build &&
-            idf.py merge-bin -o build/esp32-nfc-tool-full.bin &&
+            idf.py merge-bin -o esp32-nfc-tool-full.bin &&
             cp build/esp32-nfc-tool.bin build/esp32-nfc-tool-ota.bin
 
       - name: Upload firmware

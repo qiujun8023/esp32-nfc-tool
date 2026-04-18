@@ -4,15 +4,12 @@
 
 #include "cJSON.h"
 #include "dump_store.h"
-#include "esp_log.h"
 #include "hex_util.h"
 #include "http_server.h"
 #include "mifare_classic.h"
 #include "ndef.h"
 #include "ntag.h"
 #include "pn532.h"
-
-static const char* TAG = "api_dumps";
 
 #define DUMP_ID_MAX_LEN 39
 #define DUMP_LIST_MAX   128

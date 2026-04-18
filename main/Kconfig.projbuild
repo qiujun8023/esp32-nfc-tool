@@ -1,0 +1,22 @@
+menu "NFC Tool Configuration"
+
+    config ESP_WIFI_SSID
+        string "WiFi SoftAP SSID"
+        default "ESP32-NFC-Tool"
+        help
+            SSID of the SoftAP the tool will host for the web UI.
+
+    config ESP_WIFI_PASSWORD
+        string "WiFi SoftAP Password"
+        default ""
+        help
+            Password of the SoftAP. Leave empty to run OPEN.
+
+    config ESP_MAX_STA_CONN
+        int "Maximal STA connections"
+        default 4
+        range 1 10
+        help
+            Max number of stations that can connect to the SoftAP concurrently.
+
+endmenu

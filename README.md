@@ -47,34 +47,35 @@ idf.py -p /dev/tty.usbmodem* flash monitor
 ## 使用
 
 1. 烧录后串口能看到 `PN532 firmware: 0x...`，说明硬件 OK
-2. 手机/电脑连 Wi-Fi `esp32-nfc-tool`（开放网络，无密码）
+2. 手机/电脑连 Wi-Fi `ESP32-NFC-Tool`（开放网络，无密码）
 3. 浏览器打开 `http://192.168.4.1/` 或 `http://nfc.local/`（多数系统会自动弹）
 4. 「扫描」页贴卡 → 看到 UID → 选「读取 Dump」或 NTAG 的「读取 NDEF」
 5. 读取期间扇区/进度条实时更新；存入卡库后可改名 / 下载 / 写回 / 删除
 
 ## 引脚改动
 
-修改 `components/config/include/config.h`：
+SPI 引脚改 `main/config.h`：
 
 ```c
 #define PN532_SPI_SCK  4
 #define PN532_SPI_MISO 5
 #define PN532_SPI_MOSI 6
 #define PN532_SPI_SS   7
-#define WIFI_AP_SSID   "esp32-nfc-tool"
-#define WIFI_AP_PASS   ""
 ```
+
+Wi-Fi SSID / 密码 / 最大连接数通过 `idf.py menuconfig → NFC Tool Configuration` 调整。
 
 ## 目录结构
 
 ```
-├── main/                  入口 (main.c)
-├── components/
-│   ├── config/            全局配置 (config.h)
+├── main/
+│   ├── main.c             入口
+│   ├── config.h           全局常量（SPI 引脚 / 分区 / NVS 命名空间 …）
+│   ├── Kconfig.projbuild  menuconfig 条目（SSID / 密码 / 最大连接数）
 │   ├── nfc/               PN532 驱动 + Mifare Classic + NTAG + NDEF
 │   ├── storage/           LittleFS dump 库 + NVS 密钥库
-│   ├── network/           Wi-Fi AP + Captive DNS + HTTP/WS API + OTA
-│   └── web_ui/            前端资源（嵌入到固件）
+│   ├── net/               Wi-Fi AP + Captive DNS + HTTP/WS API + OTA
+│   └── html/              前端资源（嵌入到固件）
 ├── partitions.csv         分区表（双 OTA）
 └── sdkconfig.defaults     默认构建配置
 ```

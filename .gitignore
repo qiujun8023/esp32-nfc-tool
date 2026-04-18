@@ -1,20 +1,28 @@
-# Build
+# --- ESP-IDF（与官方 esp-idf-template 基线一致）---
 build/
+sdkconfig
 sdkconfig.old
 
-# ESP-IDF managed components
+# --- 组件管理器:下载的三方组件（dependencies.lock 应提交）---
 managed_components/
-dependencies.lock
 
-# IDE
+# --- 编辑器 / IDE ---
 .vscode/
 .idea/
 *.code-workspace
 
-# OS
+# --- 操作系统 ---
 .DS_Store
 Thumbs.db
 
-# Claude Code
-.claude/
+# --- 索引 / 缓存 ---
 .cache/
+
+# --- AI 编码助手本地会话 / 缓存（项目根规则文件如 CLAUDE.md / AGENTS.md / GEMINI.md 保留）---
+.claude/
+.opencode/
+.gemini/
+.codex/
+.cursor/
+.windsurf/
+.aider*

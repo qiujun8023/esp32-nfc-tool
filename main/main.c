@@ -6,6 +6,8 @@
 #include "esp_netif.h"
 #include "http_server.h"
 #include "keys_store.h"
+#include "nfc_lock.h"
+#include "nfc_monitor.h"
 #include "nvs_flash.h"
 #include "pn532.h"
 #include "wifi_ap.h"
@@ -31,8 +33,12 @@ void app_main(void) {
     wifi_ap_start();
     captive_dns_start();
 
+    // 锁先于 pn532_init 创建：即便 pn532 不可用，HTTP handler 也走同一路径用 nfc_acquire 拒绝并发
+    nfc_lock_init();
     if (pn532_init() != ESP_OK) {
         ESP_LOGW(TAG, "pn532 init failed, check wiring and dip switch");
+    } else {
+        nfc_monitor_start();
     }
 
     http_server_start();

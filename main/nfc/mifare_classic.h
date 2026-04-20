@@ -60,6 +60,9 @@ typedef enum {
 
 mfc_magic_type_t mfc_detect_magic(void);
 
+// MFC_MAGIC_NONE 时返回 NULL,便于调用方直接判空决定是否上报字段
+const char* mfc_magic_str(mfc_magic_type_t t);
+
 uint8_t mfc_sector_first_block(uint8_t sector);
 uint8_t mfc_sector_block_count(uint8_t sector);
 uint8_t mfc_sector_count_for_type(pn532_card_type_t type);

@@ -103,6 +103,31 @@ static void json_escape(const char* src, char* dst, size_t dst_size) {
     dst[j] = 0;
 }
 
+// 三个字符串字段都来自受控来源（hex_encode_upper / 静态常量），无 " \ 控制字符，不需 json_escape
+void ws_card_in(const char* uid_hex, uint8_t card_type, const char* type_name, const char* magic) {
+    char magic_field[32] = "";
+    if (magic && magic[0]) {
+        snprintf(magic_field, sizeof(magic_field), ",\"magic\":\"%s\"", magic);
+    }
+    char buf[192];
+    snprintf(buf, sizeof(buf),
+             "{\"type\":\"card_in\",\"uid\":\"%s\",\"cardType\":%d,\"typeName\":\"%s\"%s}",
+             uid_hex ? uid_hex : "", card_type,
+             type_name ? type_name : "", magic_field);
+    ws_progress_broadcast(buf);
+}
+
+void ws_card_meta(const char* magic) {
+    if (!magic || !magic[0]) return;
+    char buf[64];
+    snprintf(buf, sizeof(buf), "{\"type\":\"card_meta\",\"magic\":\"%s\"}", magic);
+    ws_progress_broadcast(buf);
+}
+
+void ws_card_out(void) {
+    ws_progress_broadcast("{\"type\":\"card_out\"}");
+}
+
 void ws_progress_error(const char* task_id, const char* msg) {
     char escaped_msg[160];
     json_escape(msg ? msg : "", escaped_msg, sizeof(escaped_msg));

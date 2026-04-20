@@ -299,6 +299,15 @@ esp_err_t pn532_init(void) {
     return ESP_OK;
 }
 
+const char* pn532_card_type_str(pn532_card_type_t t) {
+    switch (t) {
+        case PN532_CARD_MIFARE_CLASSIC_1K: return "Mifare Classic 1K";
+        case PN532_CARD_MIFARE_CLASSIC_4K: return "Mifare Classic 4K";
+        case PN532_CARD_MIFARE_ULTRALIGHT: return "NTAG/Ultralight";
+        default:                           return "未知";
+    }
+}
+
 uint32_t pn532_get_firmware_version(void) {
     uint8_t cmd[]  = {CMD_GET_FIRMWARE_VERSION};
     uint8_t rx[8]  = {0};

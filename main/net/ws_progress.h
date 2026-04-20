@@ -16,3 +16,7 @@ void ws_progress_sector(const char* task_id, uint8_t sector, uint8_t total,
 
 void ws_progress_done(const char* task_id, const char* result_json);
 void ws_progress_error(const char* task_id, const char* msg);
+
+void ws_card_in(const char* uid_hex, uint8_t card_type, const char* type_name, const char* magic);
+void ws_card_meta(const char* magic);
+void ws_card_out(void);

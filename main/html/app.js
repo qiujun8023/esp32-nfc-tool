@@ -23,6 +23,7 @@ const S = {
   libDetailData: null,  // detail API 返回值（懒加载）
   // 最近一次读取的摘要（方案 C：读完停留在摘要状态，用户主动点才跳详情/继续）
   lastRead: null,       // { id, kind, success, summary }
+  lastCardUid: null,    // 上一张被监控任务识别的卡 UID，用于判断 card_in 是否是同一张卡
   // 写卡子页
   writeTarget: null,    // { dumpId, dumpName, total, verifyFails, error, canceled }
 };
@@ -238,6 +239,31 @@ function handleWs(m) {
     else if (S.tab === 'library_detail') renderLibraryDetail();
     else if (S.tab === 'write_progress') renderWriteProgress();
     else if (S.tab === 'scan') renderScan();
+  } else if (m.type === 'card_in') {
+    const uid = m.uid || '';
+    const isNewCard = uid !== S.lastCardUid;
+    S.card = { uid, type: m.cardType, typeName: m.typeName, magic: m.magic || null };
+    S.lastCardUid = uid;
+    if (isNewCard) {
+      // 换了一张新卡，清掉上一张的读取记录
+      S.lastRead = null;
+      S.sectors = [];
+      S.logs = [];
+      toast((m.typeName || '未知卡') + ' · ' + fmtUid(uid), 'ok');
+    }
+    if (S.tab === 'scan' && !S.busy) renderScan();
+  } else if (m.type === 'card_meta') {
+    // monitor PRESENT 阶段补的 magic 信息（avoid 持锁内做 magic 检测）
+    if (!S.card) return;
+    if (S.card.magic === m.magic) return;
+    S.card.magic = m.magic || null;
+    if (S.tab === 'scan' && !S.busy) renderScan();
+  } else if (m.type === 'card_out') {
+    // S.card 可能已在 error 处理里被提前清空（"卡被拿走"场景），这里不再重复渲染
+    if (S.card === null) return;
+    S.card = null;
+    // lastCardUid 保留，供下次 card_in 判断是否同一张卡
+    if (S.tab === 'scan' && !S.busy) renderScan();
   } else if (m.type === 'error') {
     addLog('[错误] ' + (m.msg || '未知'), 'err');
     const wasReading = S.busyType === 'reading';
@@ -250,6 +276,11 @@ function handleWs(m) {
     if (wasWriting && S.writeTarget) {
       if (m.msg && m.msg.indexOf('取消') >= 0) S.writeTarget.canceled = true;
       else S.writeTarget.error = m.msg || '写入失败';
+    }
+    // 卡被拿走导致的失败，后端先于监控任务给出错误；这里同步清掉卡片状态，
+    // 避免 300~600ms 后到来的 card_out 再触发一次 renderScan 引发 UI 闪烁
+    if (m.msg && m.msg.indexOf('卡被拿走') >= 0) {
+      S.card = null;
     }
     toast(m.msg || '操作失败', 'error');
     if (S.tab === 'scan') renderScan();
@@ -326,26 +357,52 @@ async function refreshStatus() {
 /* ============================================================
    扫描页
    ============================================================ */
+/*
+ * 扫描页渲染分为四块独立面板，互相不依赖：
+ *   - 扫描环：只表达"当前"状态（等待 / 扫描中 / 读取中 / 写入中 / 识别到卡）
+ *   - 卡片面板：有卡就显示，含 UID / 类型 / 针对当前卡的操作按钮（读取 Dump / 读 NDEF / NDEF 写入）
+ *   - 结果面板：有 lastRead 就显示，讲"上次读取"的结果和可点操作（查看详情）
+ *   - 进度面板：正在读写 OR 有 lastRead 时显示
+ *
+ * 之前把"当前卡"与"上次结果"塞在一起，导致卡离开时操作按钮消失、
+ * 状态交叠时按钮互相替换。拆开后每块独立，不再出现 UI 状态歧义。
+ */
+
+function isNtagCard(c) {
+  if (!c) return false;
+  return c.type === 3 ||
+         (c.typeName || '').indexOf('NTAG') >= 0 ||
+         (c.typeName || '').indexOf('Ultralight') >= 0;
+}
+
 function renderScan() {
-  const hasCard = !!S.card;
+  const hasCard    = !!S.card;
   const isScanning = S.busy && S.busyType === 'scanning';
   const isReading  = S.busy && S.busyType === 'reading';
-  const lr = S.lastRead;
+  const isWriting  = S.busy && S.busyType === 'writing';
+  const lr         = S.lastRead;
+  const isNtag     = isNtagCard(S.card);
 
-  // scan-ring + label 的三态：扫描中 / 已读取（成功或失败）/ 识别卡片 / 初始
-  const ringCls =
-    (isScanning ? ' scanning' : '') +
-    ((hasCard || lr) ? ' found' : '') +
-    (lr && !lr.success ? ' err' : '');
-  const label =
-    isScanning ? '扫描中...' :
-    isReading  ? '读取中...' :
-    (lr && lr.success)  ? '读取成功' :
-    (lr && !lr.success) ? '读取失败' :
-    hasCard ? '点击扫描' : '点击扫描';
+  const parts = [ringSectionHtml({isScanning, isReading, isWriting, hasCard})];
+  if (hasCard) parts.push(cardInfoSectionHtml(S.card, {isReading, isNtag}));
+  if (lr)      parts.push(resultPanelHtml(lr));
+  app.innerHTML = parts.join('');
 
-  app.innerHTML =
-    '<div class="scan-hero">' +
+  if ((isReading || isWriting) || lr) {
+    showProgress();
+  }
+
+  bindScanActions();
+  syncBusyUi();
+}
+
+function ringSectionHtml({isScanning, isReading, isWriting, hasCard}) {
+  // 无卡时用大圆环做主视觉（引导用户"贴卡"），有卡时收缩为顶部状态条，
+  // 把视觉焦点让给下方的卡片面板
+  if (!hasCard) {
+    const ringCls = isScanning ? ' scanning' : '';
+    const label   = isScanning ? '扫描中...' : '等待贴卡';
+    return '<div class="scan-hero">' +
       '<div class="scan-ring' + ringCls + '" id="scanRing">' +
         '<svg class="scan-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">' +
           '<rect x="2" y="5" width="20" height="14" rx="2"/>' +
@@ -353,25 +410,24 @@ function renderScan() {
           '<circle cx="12" cy="15" r="1.5"/>' +
         '</svg>' +
       '</div>' +
-      '<div class="scan-label" id="scanLabel">' + esc(label) + '</div>' +
-      (lr ? '<div class="scan-summary">' + esc(lr.summary) + '</div>' : '') +
+      '<div class="scan-label">' + esc(label) + '</div>' +
+      '</div>';
+  }
+
+  let text, dotMod = '';
+  if (isReading)      { text = '读取中'; dotMod = ' read'; }
+  else if (isWriting) { text = '写入中'; dotMod = ' write'; }
+  else                  text = '已识别';
+  const sub = S.card.typeName || '';
+
+  return '<div class="scan-status">' +
+    '<div class="scan-status-dot' + dotMod + '"></div>' +
+    '<div class="scan-status-text">' + esc(text) + '</div>' +
+    (sub ? '<div class="scan-status-sub">' + esc(sub) + '</div>' : '') +
     '</div>';
-
-  if (hasCard) {
-    app.innerHTML += cardInfoHtml(S.card);
-    bindCardActions();
-  }
-
-  if (S.busy && (isReading || S.busyType === 'writing') || lr) {
-    showProgress();
-  }
-
-  $('#scanRing').onclick = doScan;
-  syncBusyUi();
 }
 
-function cardInfoHtml(c) {
-  const isNtag = c.type === 3 || (c.typeName || '').indexOf('NTAG') >= 0 || (c.typeName || '').indexOf('Ultralight') >= 0;
+function cardInfoSectionHtml(c, {isReading, isNtag}) {
   let h = '<div class="card-info">' +
     '<div class="card-header">' +
       '<div class="card-uid">' + esc(fmtUid(c.uid)) + '</div>' +
@@ -380,39 +436,24 @@ function cardInfoHtml(c) {
   if (c.magic) h += '<span class="tag magic">' + esc(c.magic) + '</span>';
   h += '</div></div>';
 
-  // 操作按钮
-  const isReading = S.busy && S.busyType === 'reading';
-  const lr = S.lastRead;
   h += '<div class="action-grid">';
-  if (lr) {
-    // 读取完成（成功或失败）：单按钮。继续扫描 = 点上方扫描环，不做重复按钮。
-    if (lr.success && lr.id) {
-      h += '<button class="act-btn primary full" id="actViewDetail">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>' +
-        '查看详情</button>';
-    } else {
-      h += '<button class="act-btn primary nfc-op full" id="actRetryRead">' +
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>' +
-        '重试读取</button>';
-    }
-  } else if (isReading) {
-    h += '<button class="act-btn cancel-btn' + (isNtag ? '' : ' full') + '" id="actDump">' +
+  if (isReading) {
+    h += '<button class="act-btn cancel-btn full" id="actCancelRead">' +
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' +
       '取消读取</button>';
   } else {
     h += '<button class="act-btn primary nfc-op' + (isNtag ? '' : ' full') + '" id="actDump">' +
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>' +
       '读取 Dump</button>';
-  }
-  if (isNtag && !lr && !isReading) {
-    h += '<button class="act-btn nfc-op" id="actNdefRead">' +
-      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4a2 2 0 012-2h8l6 6v12a2 2 0 01-2 2H6a2 2 0 01-2-2v-3"/><path d="M14 2v6h6"/><path d="M2 15h10M8 11l4 4-4 4"/></svg>' +
-      '读取 NDEF</button>';
+    if (isNtag) {
+      h += '<button class="act-btn nfc-op" id="actNdefRead">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4a2 2 0 012-2h8l6 6v12a2 2 0 01-2 2H6a2 2 0 01-2-2v-3"/><path d="M14 2v6h6"/><path d="M2 15h10M8 11l4 4-4 4"/></svg>' +
+        '读取 NDEF</button>';
+    }
   }
   h += '</div>';
 
-  // NDEF section for NTAG（读取完成态隐藏，引导用户先 查看详情/继续扫描）
-  if (isNtag && !lr && !isReading) {
+  if (isNtag && !isReading) {
     h += '<div class="ndef-section" id="ndefSection">' +
       '<div class="ndef-title">NDEF 写入</div>' +
       '<div id="ndefResult"></div>' +
@@ -434,25 +475,46 @@ function cardInfoHtml(c) {
   return h;
 }
 
-function bindCardActions() {
-  const c = S.card;
-  if (!c) return;
+function resultPanelHtml(lr) {
+  const okCls  = lr.success ? '' : ' result-err';
+  const title  = lr.success ? '上次读取成功' : '上次读取失败';
+  const iconSvg = lr.success
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><polyline points="20 6 9 17 4 12"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
+  let h = '<div class="result-bar' + okCls + '">' +
+    '<div class="result-bar-icon">' + iconSvg + '</div>' +
+    '<div class="result-bar-main">' +
+      '<div class="result-bar-title">' + esc(title) + '</div>' +
+      '<div class="result-bar-summary">' + esc(lr.summary) + '</div>' +
+    '</div>';
+
+  if (lr.success && lr.id) {
+    h += '<button class="result-bar-action" id="actViewDetail">查看详情</button>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function bindScanActions() {
+  // 大圆环在 hasCard=true 时会被替换为不可点击的状态条，此时找不到 #scanRing
+  const ring = $('#scanRing');
+  if (ring) ring.onclick = doScan;
 
   const dumpBtn = $('#actDump');
-  const isReading = S.busy && S.busyType === 'reading';
-  if (dumpBtn) dumpBtn.onclick = isReading ? doCancelOp : doDump;
+  if (dumpBtn) dumpBtn.onclick = doDump;
 
-  const viewBtn = $('#actViewDetail');
-  if (viewBtn) viewBtn.onclick = viewLastReadDetail;
-
-  const retryBtn = $('#actRetryRead');
-  if (retryBtn) retryBtn.onclick = () => { S.lastRead = null; doDump(); };
+  const cancelBtn = $('#actCancelRead');
+  if (cancelBtn) cancelBtn.onclick = doCancelOp;
 
   const ndefReadBtn = $('#actNdefRead');
   if (ndefReadBtn) ndefReadBtn.onclick = doNdefRead;
 
   const ndefWriteBtn = $('#actNdefWrite');
   if (ndefWriteBtn) ndefWriteBtn.onclick = doNdefWrite;
+
+  const viewBtn = $('#actViewDetail');
+  if (viewBtn) viewBtn.onclick = viewLastReadDetail;
 
   const ndefType = $('#ndefType');
   if (ndefType) {
@@ -501,6 +563,8 @@ async function doScan() {
       return;
     }
     S.card = r;
+    // 同步 lastCardUid，避免 monitor 紧接的 card_in 把同一张卡判为新卡再 toast 一次
+    S.lastCardUid = r.uid;
     renderScan();
     toast(r.typeName + ' · ' + fmtUid(r.uid), 'ok');
   } catch (e) {
@@ -1112,10 +1176,8 @@ async function handleOta(ev) {
    路由
    ============================================================ */
 function setTab(name) {
-  if (S.tab !== name && !S.busy) {
-    // 离开扫描页时清卡 + 摘要，避免回来看到陈旧信息
-    if (S.tab === 'scan') { S.card = null; S.lastRead = null; }
-  }
+  // S.card 由 WS card_in / card_out 实时维护，S.lastRead 由读取完成事件维护，
+  // 两者都是"当前事实"，不需要在切页时清理；否则从详情页返回扫描页会丢失上次结果。
   S.tab = name;
   // library_detail / write_progress 都仍然高亮卡库 tab
   const navName = (name === 'library_detail' || name === 'write_progress') ? 'library' : name;

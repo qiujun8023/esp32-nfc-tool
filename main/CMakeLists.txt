@@ -2,6 +2,7 @@ idf_component_register(
     SRCS "main.c"
          "nfc/pn532.c" "nfc/mifare_classic.c" "nfc/ntag.c"
          "nfc/ndef.c" "nfc/default_keys.c" "nfc/nfc_cancel.c"
+         "nfc/nfc_lock.c" "nfc/nfc_monitor.c"
          "storage/dump_store.c" "storage/keys_store.c" "storage/hex_util.c"
          "net/wifi_ap.c" "net/captive_dns.c" "net/http_server.c"
          "net/api_nfc.c" "net/api_dumps.c" "net/api_keys.c" "net/api_ota.c"

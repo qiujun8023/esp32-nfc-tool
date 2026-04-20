@@ -33,3 +33,5 @@ esp_err_t pn532_read_passive_target(pn532_target_t* out, uint32_t timeout_ms);
 esp_err_t pn532_in_data_exchange(const uint8_t* tx, uint8_t tx_len,
                                  uint8_t* rx, uint8_t* rx_len,
                                  uint32_t timeout_ms);
+
+const char* pn532_card_type_str(pn532_card_type_t t);

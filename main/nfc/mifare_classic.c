@@ -87,6 +87,14 @@ mfc_magic_type_t mfc_detect_magic(void) {
     return MFC_MAGIC_NONE;
 }
 
+const char* mfc_magic_str(mfc_magic_type_t t) {
+    switch (t) {
+        case MFC_MAGIC_GEN1A: return "Gen1a";
+        case MFC_MAGIC_GEN2:  return "Gen2";
+        default:              return NULL;
+    }
+}
+
 typedef enum {
     TRY_OK = 0,
     TRY_WRONG_KEY,

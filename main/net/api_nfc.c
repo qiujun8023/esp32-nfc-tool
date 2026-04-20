@@ -1,8 +1,3 @@
-/*
- * 全局只允许一个 NFC 任务同时运行；用 binary semaphore 而非 mutex 是因为
- * HTTP 任务 take、后台任务 give，不符合 mutex 所有权协议。
- */
-
 #include <stdio.h>
 #include <string.h>
 
@@ -11,7 +6,6 @@
 #include "dump_store.h"
 #include "esp_random.h"
 #include "freertos/FreeRTOS.h"
-#include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "hex_util.h"
 #include "http_server.h"
@@ -19,13 +13,13 @@
 #include "mifare_classic.h"
 #include "ndef.h"
 #include "nfc_cancel.h"
+#include "nfc_lock.h"
+#include "nfc_monitor.h"
 #include "ntag.h"
 #include "pn532.h"
 #include "ws_progress.h"
 
 static const char JSON_CT[] = "application/json";
-
-static SemaphoreHandle_t s_busy = NULL;
 
 static esp_err_t send_json(httpd_req_t* req, const char* s) {
     httpd_resp_set_type(req, JSON_CT);
@@ -37,34 +31,13 @@ static void make_task_id(char* out) {
     snprintf(out, 16, "t%lu", (unsigned long)(esp_random() & 0xFFFFFF));
 }
 
-static const char* card_type_str(pn532_card_type_t t) {
-    switch (t) {
-        case PN532_CARD_MIFARE_CLASSIC_1K:
-            return "Mifare Classic 1K";
-        case PN532_CARD_MIFARE_CLASSIC_4K:
-            return "Mifare Classic 4K";
-        case PN532_CARD_MIFARE_ULTRALIGHT:
-            return "NTAG/Ultralight";
-        default:
-            return "未知";
-    }
-}
-
-static const char* magic_type_str(mfc_magic_type_t t) {
-    switch (t) {
-        case MFC_MAGIC_GEN1A: return "Gen1a";
-        case MFC_MAGIC_GEN2:  return "Gen2";
-        default:              return "";
-    }
-}
-
 static esp_err_t handle_scan(httpd_req_t* req) {
-    if (xSemaphoreTake(s_busy, 0) != pdTRUE) {
+    if (nfc_acquire(pdMS_TO_TICKS(1500)) != pdTRUE) {
         return send_json(req, "{\"ok\":false,\"err\":\"另一项操作正在进行\"}");
     }
     pn532_target_t tgt;
     if (pn532_read_passive_target(&tgt, 800) != ESP_OK) {
-        xSemaphoreGive(s_busy);
+        nfc_release();
         return send_json(req, "{\"ok\":false,\"err\":\"未发现卡片\"}");
     }
     char uid_hex[24];
@@ -82,15 +55,18 @@ static esp_err_t handle_scan(httpd_req_t* req) {
     cJSON_AddNumberToObject(root, "atqa", tgt.atqa);
     cJSON_AddNumberToObject(root, "sak", tgt.sak);
     cJSON_AddNumberToObject(root, "type", tgt.type);
-    cJSON_AddStringToObject(root, "typeName", card_type_str(tgt.type));
-    if (magic != MFC_MAGIC_NONE) {
-        cJSON_AddStringToObject(root, "magic", magic_type_str(magic));
+    cJSON_AddStringToObject(root, "typeName", pn532_card_type_str(tgt.type));
+    const char* magic_name = mfc_magic_str(magic);
+    if (magic_name) {
+        cJSON_AddStringToObject(root, "magic", magic_name);
     }
     char* s = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
     esp_err_t err = send_json(req, s);
     free(s);
-    xSemaphoreGive(s_busy);
+    nfc_release();
+    // 告诉 monitor 卡已确认存在；它就不会再扫一次重复发 card_in
+    nfc_monitor_mark_present(tgt.uid, tgt.uid_len);
     return err;
 }
 
@@ -180,12 +156,12 @@ static void task_full_read(void* arg) {
 
 done:
     free(a);
-    xSemaphoreGive(s_busy);
+    nfc_release();
     vTaskDelete(NULL);
 }
 
 static esp_err_t handle_read(httpd_req_t* req) {
-    if (xSemaphoreTake(s_busy, 0) != pdTRUE) {
+    if (nfc_acquire(pdMS_TO_TICKS(1500)) != pdTRUE) {
         return send_json(req, "{\"ok\":false,\"err\":\"另一项操作正在进行\"}");
     }
     char body[160] = {0};
@@ -195,7 +171,7 @@ static esp_err_t handle_read(httpd_req_t* req) {
 
     read_task_arg_t* a = calloc(1, sizeof(*a));
     if (!a) {
-        xSemaphoreGive(s_busy);
+        nfc_release();
         return send_json(req, "{\"ok\":false,\"err\":\"内存不足\"}");
     }
     make_task_id(a->task_id);
@@ -214,7 +190,7 @@ static esp_err_t handle_read(httpd_req_t* req) {
     snprintf(resp, sizeof(resp), "{\"ok\":true,\"taskId\":\"%s\"}", a->task_id);
 
     if (xTaskCreate(task_full_read, "nfc_read", 8192, a, 5, NULL) != pdPASS) {
-        xSemaphoreGive(s_busy);
+        nfc_release();
         free(a);
         return send_json(req, "{\"ok\":false,\"err\":\"任务创建失败\"}");
     }
@@ -255,36 +231,36 @@ static void task_full_write(void* arg) {
     ws_progress_done(a->task_id, result);
 done:
     free(a);
-    xSemaphoreGive(s_busy);
+    nfc_release();
     vTaskDelete(NULL);
 }
 
 static esp_err_t handle_write(httpd_req_t* req) {
-    if (xSemaphoreTake(s_busy, 0) != pdTRUE) {
+    if (nfc_acquire(pdMS_TO_TICKS(1500)) != pdTRUE) {
         return send_json(req, "{\"ok\":false,\"err\":\"另一项操作正在进行\"}");
     }
     char body[128] = {0};
     int  n         = httpd_req_recv(req, body, sizeof(body) - 1);
     if (n <= 0) {
-        xSemaphoreGive(s_busy);
+        nfc_release();
         return send_json(req, "{\"ok\":false}");
     }
     body[n]  = 0;
     cJSON* j = cJSON_Parse(body);
     if (!j) {
-        xSemaphoreGive(s_busy);
+        nfc_release();
         return send_json(req, "{\"ok\":false}");
     }
     cJSON* did = cJSON_GetObjectItem(j, "dumpId");
     if (!cJSON_IsString(did) || !id_is_safe(did->valuestring, 39)) {
         cJSON_Delete(j);
-        xSemaphoreGive(s_busy);
+        nfc_release();
         return send_json(req, "{\"ok\":false,\"err\":\"缺 dumpId 或非法\"}");
     }
     write_task_arg_t* a = calloc(1, sizeof(*a));
     if (!a) {
         cJSON_Delete(j);
-        xSemaphoreGive(s_busy);
+        nfc_release();
         return send_json(req, "{\"ok\":false,\"err\":\"内存不足\"}");
     }
     strlcpy(a->dump_id, did->valuestring, sizeof(a->dump_id));
@@ -296,7 +272,7 @@ static esp_err_t handle_write(httpd_req_t* req) {
     snprintf(resp, sizeof(resp), "{\"ok\":true,\"taskId\":\"%s\"}", a->task_id);
 
     if (xTaskCreate(task_full_write, "nfc_write", 8192, a, 5, NULL) != pdPASS) {
-        xSemaphoreGive(s_busy);
+        nfc_release();
         free(a);
         return send_json(req, "{\"ok\":false}");
     }
@@ -309,28 +285,28 @@ static esp_err_t handle_cancel(httpd_req_t* req) {
 }
 
 static esp_err_t handle_ndef_read(httpd_req_t* req) {
-    if (xSemaphoreTake(s_busy, 0) != pdTRUE) {
+    if (nfc_acquire(pdMS_TO_TICKS(1500)) != pdTRUE) {
         return send_json(req, "{\"ok\":false,\"err\":\"另一项操作正在进行\"}");
     }
     pn532_target_t tgt;
     if (pn532_read_passive_target(&tgt, 800) != ESP_OK) {
-        xSemaphoreGive(s_busy);
+        nfc_release();
         return send_json(req, "{\"ok\":false,\"err\":\"未发现卡片\"}");
     }
     if (tgt.type != PN532_CARD_MIFARE_ULTRALIGHT) {
-        xSemaphoreGive(s_busy);
+        nfc_release();
         return send_json(req, "{\"ok\":false,\"err\":\"不是 NTAG/Ultralight 卡\"}");
     }
 
     ntag_dump_t* dump = calloc(1, sizeof(ntag_dump_t));
     if (!dump) {
-        xSemaphoreGive(s_busy);
+        nfc_release();
         return send_json(req, "{\"ok\":false,\"err\":\"内存不足\"}");
     }
     esp_err_t rerr = ntag_full_read(&tgt, dump);
     if (rerr != ESP_OK) {
         free(dump);
-        xSemaphoreGive(s_busy);
+        nfc_release();
         return send_json(req, "{\"ok\":false,\"err\":\"读取失败\"}");
     }
 
@@ -353,35 +329,35 @@ static esp_err_t handle_ndef_read(httpd_req_t* req) {
     cJSON_Delete(root);
     esp_err_t err = send_json(req, s);
     free(s);
-    xSemaphoreGive(s_busy);
+    nfc_release();
     return err;
 }
 
 static esp_err_t handle_ndef_write(httpd_req_t* req) {
-    if (xSemaphoreTake(s_busy, 0) != pdTRUE) {
+    if (nfc_acquire(pdMS_TO_TICKS(1500)) != pdTRUE) {
         return send_json(req, "{\"ok\":false,\"err\":\"另一项操作正在进行\"}");
     }
     pn532_target_t tgt;
     if (pn532_read_passive_target(&tgt, 800) != ESP_OK) {
-        xSemaphoreGive(s_busy);
+        nfc_release();
         return send_json(req, "{\"ok\":false,\"err\":\"未发现卡片\"}");
     }
     if (tgt.type != PN532_CARD_MIFARE_ULTRALIGHT) {
-        xSemaphoreGive(s_busy);
+        nfc_release();
         return send_json(req, "{\"ok\":false,\"err\":\"不是 NTAG/Ultralight 卡\"}");
     }
 
     char body[512] = {0};
     int  n         = httpd_req_recv(req, body, sizeof(body) - 1);
     if (n <= 0) {
-        xSemaphoreGive(s_busy);
+        nfc_release();
         return send_json(req, "{\"ok\":false,\"err\":\"空 body\"}");
     }
     body[n] = 0;
 
     cJSON* j = cJSON_Parse(body);
     if (!j) {
-        xSemaphoreGive(s_busy);
+        nfc_release();
         return send_json(req, "{\"ok\":false,\"err\":\"JSON 格式错误\"}");
     }
 
@@ -400,17 +376,12 @@ static esp_err_t handle_ndef_write(httpd_req_t* req) {
         }
     }
     cJSON_Delete(j);
-    xSemaphoreGive(s_busy);
+    nfc_release();
 
     return send_json(req, err == ESP_OK ? "{\"ok\":true}" : "{\"ok\":false,\"err\":\"写入失败\"}");
 }
 
 void api_nfc_register(httpd_handle_t srv) {
-    if (!s_busy) {
-        s_busy = xSemaphoreCreateBinary();
-        xSemaphoreGive(s_busy);
-    }
-
     httpd_uri_t u_scan   = {.uri = "/api/scan", .method = HTTP_POST, .handler = handle_scan};
     httpd_uri_t u_read   = {.uri = "/api/read", .method = HTTP_POST, .handler = handle_read};
     httpd_uri_t u_write  = {.uri = "/api/write", .method = HTTP_POST, .handler = handle_write};

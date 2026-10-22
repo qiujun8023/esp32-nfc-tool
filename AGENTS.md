@@ -6,7 +6,7 @@
 
 - ESP-IDF v5.5.6，安装在 `~/.esp/esp-idf-v5.5.6`。项目根目录的 `.envrc`（不入库）由 direnv 自动加载 IDF 环境；没有 direnv 时执行 `. ~/.esp/esp-idf-v5.5.6/export.sh`。
 - 目标芯片 esp32c3，已写在 `sdkconfig.defaults` 的 `CONFIG_IDF_TARGET`，不需要 `idf.py set-target`。
-- CI（`.github/workflows/build.yml`）固定同一 IDF 版本。升级 IDF 时本地 `.envrc`、CI 和本文件同步修改。
+- CI（`.github/workflows/firmware-build.yml`）固定同一 IDF 版本。升级 IDF 时本地 `.envrc`、CI 和本文件同步修改。
 
 ## 常用命令
 

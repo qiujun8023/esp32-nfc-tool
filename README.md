@@ -37,9 +37,8 @@ PN532 模块上的拨码开关切到 SPI 模式（请看模块丝印）。
 
 ```bash
 cd esp32-nfc-tool
-idf.py set-target esp32c3
 idf.py build
-idf.py -p /dev/tty.usbmodem* flash monitor
+idf.py flash monitor
 ```
 
 首次构建会自动从 IDF Component Manager 拉取 `joltwallet/littlefs` 和 `espressif/mdns`。

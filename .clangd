@@ -1,0 +1,15 @@
+CompileFlags:
+  CompilationDatabase: build
+  # GCC 专有参数，clang 不认识会报错
+  Remove:
+    - -fno-tree-switch-conversion
+    - -fstrict-volatile-bitfields
+    - -fno-shrink-wrap
+    - -fno-inline-functions-called-once
+    - -mlongcalls
+    - -mdisable-hardware-atomics
+    - -fno-builtin-*
+    - -Wformat-overflow*
+    - -Wformat-truncation*
+    - -Wlogical-op
+    - -Wno-old-style-declaration
